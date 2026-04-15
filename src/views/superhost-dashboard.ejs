@@ -8,15 +8,34 @@
 <% const labLicenseKeys = lab.licenseKeys || []; %>
 <% const labActiveKeysUsed = lab.activeKeysUsed || 0; %>
 
-<section class="dashboard-head">
-  <h1>Superhost Dashboard</h1>
-  <p>
-    Signed in as <strong><%= currentUser.email %></strong>. Superhost controls stay available, and this dashboard now includes a mentor-style test lab.
-  </p>
+<section class="dashboard-head dashboard-head-drawer">
+  <div>
+    <h1>Superhost Dashboard</h1>
+    <p>
+      Signed in as <strong><%= currentUser.email %></strong>. Superhost controls stay available, and this dashboard now includes a mentor-style test lab.
+    </p>
+  </div>
+  <button
+    type="button"
+    class="dashboard-drawer-toggle"
+    data-dashboard-drawer-toggle
+    aria-expanded="false"
+    aria-controls="superhost-dashboard-drawer"
+    aria-label="Open sidebar menu"
+  >
+    <span aria-hidden="true">☰</span>
+    Menu
+  </button>
 </section>
 
-<section class="mentor-layout">
-  <aside class="mentor-sidebar">
+<section class="mentor-layout drawer-layout">
+  <button
+    type="button"
+    class="dashboard-drawer-backdrop"
+    data-dashboard-drawer-backdrop
+    aria-label="Close sidebar menu"
+  ></button>
+  <aside class="mentor-sidebar" id="superhost-dashboard-drawer" data-dashboard-drawer>
     <div class="sidebar-brand">
       <span class="sidebar-logo">F</span>
       <div>

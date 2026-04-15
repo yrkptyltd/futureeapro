@@ -384,6 +384,39 @@ body::before {
   margin-bottom: 1rem;
 }
 
+.dashboard-head-drawer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.dashboard-drawer-toggle {
+  display: none;
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: #fceff2;
+  border-radius: 12px;
+  padding: 0.46rem 0.62rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.34rem;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--glow) 20%, transparent);
+}
+
+.dashboard-drawer-toggle span {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.dashboard-drawer-backdrop {
+  display: none;
+}
+
 .mentor-layout {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -2223,8 +2256,61 @@ code {
     grid-template-columns: 1fr;
   }
 
-  .mentor-sidebar {
-    position: static;
+  .dashboard-head-drawer {
+    align-items: center;
+  }
+
+  .dashboard-head-drawer > div {
+    min-width: 0;
+  }
+
+  .dashboard-drawer-toggle {
+    display: inline-flex;
+    position: sticky;
+    top: 0.45rem;
+    z-index: 55;
+    flex-shrink: 0;
+  }
+
+  .drawer-layout .mentor-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 70;
+    width: min(84vw, 320px);
+    height: 100dvh;
+    overflow-y: auto;
+    border-radius: 0 16px 16px 0;
+    transform: translateX(-108%);
+    transition: transform 220ms ease;
+    padding-top: 1rem;
+  }
+
+  .drawer-layout.is-drawer-open .mentor-sidebar {
+    transform: translateX(0);
+  }
+
+  .drawer-layout .dashboard-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    background: rgba(2, 3, 8, 0.62);
+    transition: opacity 200ms ease;
+  }
+
+  .drawer-layout.is-drawer-open .dashboard-drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body.dashboard-drawer-open {
+    overflow: hidden;
   }
 
   .totals-grid {

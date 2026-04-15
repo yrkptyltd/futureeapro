@@ -1,15 +1,34 @@
 <%- include('partials/top', { title: title }) %>
 
-<section class="dashboard-head">
-  <h1>Mentor Dashboard</h1>
-  <p>
-    Welcome, <strong><%= mentor.name %></strong>.
-    Your Mentor ID is <strong><%= mentor.mentorPortalId %></strong>.
-  </p>
+<section class="dashboard-head dashboard-head-drawer">
+  <div>
+    <h1>Mentor Dashboard</h1>
+    <p>
+      Welcome, <strong><%= mentor.name %></strong>.
+      Your Mentor ID is <strong><%= mentor.mentorPortalId %></strong>.
+    </p>
+  </div>
+  <button
+    type="button"
+    class="dashboard-drawer-toggle"
+    data-dashboard-drawer-toggle
+    aria-expanded="false"
+    aria-controls="mentor-dashboard-drawer"
+    aria-label="Open sidebar menu"
+  >
+    <span aria-hidden="true">☰</span>
+    Menu
+  </button>
 </section>
 
-<section class="mentor-layout">
-  <aside class="mentor-sidebar">
+<section class="mentor-layout drawer-layout">
+  <button
+    type="button"
+    class="dashboard-drawer-backdrop"
+    data-dashboard-drawer-backdrop
+    aria-label="Close sidebar menu"
+  ></button>
+  <aside class="mentor-sidebar" id="mentor-dashboard-drawer" data-dashboard-drawer>
     <div class="sidebar-brand">
       <span class="sidebar-logo">F</span>
       <div>
