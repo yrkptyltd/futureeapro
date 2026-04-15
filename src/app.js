@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const {
   ensureDataFile,
   ensureMentorPortalIds,
+  listUsers,
   getPortalTheme,
   updatePortalTheme,
   getUserById,
@@ -1357,27 +1358,47 @@ function normalizeSuperhostDashboardSection(value) {
 }
 
 function bootstrapSuperhost() {
-  const existing = getUserByEmail(SUPERHOST_EMAIL);
-  if (existing) {
-    if (existing.role !== 'superhost') {
-      updateUser(existing.id, {
-        role: 'superhost',
-        approved: true,
-        subscriptionActive: true,
-        licenseKeyLimit: 9999,
-      });
-    }
+  const users = listUsers();
+  const existingByEmail = getUserByEmail(SUPERHOST_EMAIL);
+  let superhostTarget = existingByEmail || users.find((user) => user.role === 'superhost') || null;
+
+  const passwordData = createPasswordHash(SUPERHOST_PASSWORD);
+  if (!superhostTarget) {
+    createUser({
+      name: 'Platform Superhost',
+      email: SUPERHOST_EMAIL,
+      passwordHash: passwordData.hash,
+      passwordSalt: passwordData.salt,
+      role: 'superhost',
+    });
     return;
   }
 
-  const passwordData = createPasswordHash(SUPERHOST_PASSWORD);
-  createUser({
-    name: 'Platform Superhost',
-    email: SUPERHOST_EMAIL,
-    passwordHash: passwordData.hash,
-    passwordSalt: passwordData.salt,
+  const updates = {
     role: 'superhost',
-  });
+    approved: true,
+    subscriptionActive: true,
+    licenseKeyLimit: 9999,
+  };
+
+  const emailTakenByAnother = users.some(
+    (user) => user.id !== superhostTarget.id && String(user.email || '').trim().toLowerCase() === SUPERHOST_EMAIL
+  );
+  if (!emailTakenByAnother && superhostTarget.email !== SUPERHOST_EMAIL) {
+    updates.email = SUPERHOST_EMAIL;
+  }
+
+  const passwordMatches = verifyPassword(
+    SUPERHOST_PASSWORD,
+    superhostTarget.passwordSalt,
+    superhostTarget.passwordHash
+  );
+  if (!passwordMatches) {
+    updates.passwordHash = passwordData.hash;
+    updates.passwordSalt = passwordData.salt;
+  }
+
+  updateUser(superhostTarget.id, updates);
 }
 
 function ensureDefaultThemePalette() {

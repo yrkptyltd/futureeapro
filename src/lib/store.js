@@ -67,6 +67,10 @@ function getUserById(id) {
   return readData().users.find((user) => user.id === id);
 }
 
+function listUsers() {
+  return readData().users;
+}
+
 function getUserByEmail(email) {
   const normalized = String(email || '').trim().toLowerCase();
   return readData().users.find((user) => user.email === normalized);
@@ -401,6 +405,7 @@ module.exports = {
   ensureMentorPortalIds,
   getPortalTheme,
   updatePortalTheme,
+  listUsers,
   getUserById,
   getUserByEmail,
   getMentorByPortalId,
