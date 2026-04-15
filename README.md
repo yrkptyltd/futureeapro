@@ -65,6 +65,23 @@ Optional environment variables:
 - `RENDER_START_COMMAND` (default: `npm start`)
 - `SESSION_SECRET`, `SUPERHOST_EMAIL`, `SUPERHOST_PASSWORD`, `CLIENT_BYPASS_EMAILS`
 
+## Full Auto Bootstrap (GitHub + Render)
+Create GitHub repo, push this project, create Render web service, and attach domains:
+
+```bash
+GITHUB_TOKEN=your_github_pat \
+RENDER_API_KEY=your_render_api_key \
+GITHUB_REPO=futureeapro \
+RENDER_SERVICE_NAME=futureeapro-web \
+RENDER_CUSTOM_DOMAINS=futureeapro.com,www.futureeapro.com \
+bash scripts/bootstrap-github-and-render.sh
+```
+
+Optional:
+- `GITHUB_OWNER` (auto-detected from token if omitted)
+- `GITHUB_BRANCH` (default: `main`)
+- `GITHUB_PRIVATE` (default: `false`)
+
 ## Generate Client App Previews
 Run all iOS and Android client previews automatically:
 ```bash
