@@ -3,7 +3,7 @@
 <% const lab = superhostLab || {}; %>
 <% const labAccount = lab.account || currentUser; %>
 <% const labTotals = lab.dashboardTotals || { totalKeys: 0, totalGenerated: 0, activeSubscribers: 0 }; %>
-<% const labBusiness = lab.businessMetrics || { robotPricePerKey: 0, monthlyKeyTarget: 0, keysSoldThisMonth: 0, monthlyRevenue: 0, estimatedTotalRevenue: 0, projectedRevenueByMentorPrice: 0, targetRemaining: 0, targetProgressPercent: 0, targetReached: false, monthLabel: 'This Month' }; %>
+<% const labBusiness = lab.businessMetrics || { businessCurrency: 'ZAR', currencySymbol: 'R', robotPricePerKey: 0, monthlyKeyTarget: 0, keysSoldThisMonth: 0, monthlyRevenue: 0, estimatedTotalRevenue: 0, projectedRevenueByMentorPrice: 0, goalRevenueAtTarget: 0, targetRemaining: 0, targetProgressPercent: 0, targetReached: false, monthLabel: 'This Month' }; %>
 <% const labRobots = lab.robots || []; %>
 <% const labLicenseKeys = lab.licenseKeys || []; %>
 <% const labActiveKeysUsed = lab.activeKeysUsed || 0; %>
@@ -192,6 +192,14 @@
               Monthly Target (keys)
               <input type="number" name="monthlyKeyTarget" min="0" step="1" value="<%= labBusiness.monthlyKeyTarget %>" required />
             </label>
+
+            <label>
+              Currency
+              <select name="businessCurrency">
+                <option value="ZAR" <%= labBusiness.businessCurrency === 'ZAR' ? 'selected' : '' %>>ZAR (R)</option>
+                <option value="USD" <%= labBusiness.businessCurrency === 'USD' ? 'selected' : '' %>>USD ($)</option>
+              </select>
+            </label>
           </div>
 
           <button type="submit" class="button">Save Business Targets</button>
@@ -206,6 +214,7 @@
           <article class="business-card">
             <h3>Monthly Revenue</h3>
             <p class="business-value">R<%= Number(labBusiness.monthlyRevenue || 0).toFixed(2) %></p>
+            <p class="hint">Subscription plans (ZAR)</p>
           </article>
 
           <article class="business-card">
@@ -215,7 +224,12 @@
 
           <article class="business-card">
             <h3>Projected Revenue (Your Price)</h3>
-            <p class="business-value">R<%= Number(labBusiness.projectedRevenueByMentorPrice || 0).toFixed(2) %></p>
+            <p class="business-value"><%= labBusiness.currencySymbol %><%= Number(labBusiness.projectedRevenueByMentorPrice || 0).toFixed(2) %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>Goal Revenue (At Target)</h3>
+            <p class="business-value"><%= labBusiness.currencySymbol %><%= Number(labBusiness.goalRevenueAtTarget || 0).toFixed(2) %></p>
           </article>
 
           <article class="business-card">

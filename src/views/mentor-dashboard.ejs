@@ -118,6 +118,14 @@
                 required
               />
             </label>
+
+            <label>
+              Currency
+              <select name="businessCurrency">
+                <option value="ZAR" <%= businessMetrics.businessCurrency === 'ZAR' ? 'selected' : '' %>>ZAR (R)</option>
+                <option value="USD" <%= businessMetrics.businessCurrency === 'USD' ? 'selected' : '' %>>USD ($)</option>
+              </select>
+            </label>
           </div>
 
           <button type="submit" class="button">Save Business Targets</button>
@@ -132,6 +140,7 @@
           <article class="business-card">
             <h3>Monthly Revenue</h3>
             <p class="business-value">R<%= businessMetrics.monthlyRevenue.toFixed(2) %></p>
+            <p class="hint">Subscription plans (ZAR)</p>
           </article>
 
           <article class="business-card">
@@ -141,7 +150,12 @@
 
           <article class="business-card">
             <h3>Projected Revenue (Your Price)</h3>
-            <p class="business-value">R<%= businessMetrics.projectedRevenueByMentorPrice.toFixed(2) %></p>
+            <p class="business-value"><%= businessMetrics.currencySymbol %><%= businessMetrics.projectedRevenueByMentorPrice.toFixed(2) %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>Goal Revenue (At Target)</h3>
+            <p class="business-value"><%= businessMetrics.currencySymbol %><%= businessMetrics.goalRevenueAtTarget.toFixed(2) %></p>
           </article>
 
           <article class="business-card">

@@ -108,6 +108,7 @@ function createUser(userInput) {
     licenseKeyLimit: defaultLicenseLimit,
     robotPricePerKey: 0,
     monthlyKeyTarget: 0,
+    businessCurrency: 'ZAR',
     profileHeadline: '',
     profileBio: '',
     profilePhone: '',

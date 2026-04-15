@@ -732,6 +732,7 @@ app.post('/mentor/business-settings', requireAuth, requireRole('mentor'), (req, 
   const body = req.body || {};
   const robotPricePerKey = Number(body.robotPricePerKey);
   const monthlyKeyTarget = Number(body.monthlyKeyTarget);
+  const businessCurrency = normalizeBusinessCurrency(body.businessCurrency);
 
   if (!Number.isFinite(robotPricePerKey) || robotPricePerKey < 0) {
     setFlash(req, 'error', 'Robot price must be a non-negative number.');
@@ -746,6 +747,7 @@ app.post('/mentor/business-settings', requireAuth, requireRole('mentor'), (req, 
   updateUser(req.currentUser.id, {
     robotPricePerKey: toCurrencyNumber(robotPricePerKey),
     monthlyKeyTarget,
+    businessCurrency,
   });
 
   setFlash(req, 'success', 'Business settings updated.');
@@ -938,6 +940,7 @@ app.post('/superhost/business-settings', requireAuth, requireRole('superhost'), 
   const body = req.body || {};
   const robotPricePerKey = Number(body.robotPricePerKey);
   const monthlyKeyTarget = Number(body.monthlyKeyTarget);
+  const businessCurrency = normalizeBusinessCurrency(body.businessCurrency);
 
   if (!Number.isFinite(robotPricePerKey) || robotPricePerKey < 0) {
     setFlash(req, 'error', 'Robot price must be a non-negative number.');
@@ -952,6 +955,7 @@ app.post('/superhost/business-settings', requireAuth, requireRole('superhost'), 
   updateUser(req.currentUser.id, {
     robotPricePerKey: toCurrencyNumber(robotPricePerKey),
     monthlyKeyTarget,
+    businessCurrency,
   });
 
   setFlash(req, 'success', 'Superhost lab business settings updated.');
@@ -1310,6 +1314,13 @@ function toCurrencyNumber(value) {
   return Number(parsed.toFixed(2));
 }
 
+function normalizeBusinessCurrency(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase();
+  return normalized === 'USD' ? 'USD' : 'ZAR';
+}
+
 function sumAmount(values) {
   let total = 0;
   for (const value of values) {
@@ -1343,6 +1354,8 @@ function buildOperatorDashboard(userId, now) {
   ).length;
   const robotPricePerKey = toNonNegativeNumber(account.robotPricePerKey);
   const monthlyKeyTarget = toNonNegativeInteger(account.monthlyKeyTarget, 10);
+  const businessCurrency = normalizeBusinessCurrency(account.businessCurrency);
+  const currencySymbol = businessCurrency === 'USD' ? '$' : 'R';
   const monthlyRevenue = toCurrencyNumber(
     sumAmount(
       clientSubscriptions
@@ -1354,6 +1367,7 @@ function buildOperatorDashboard(userId, now) {
     sumAmount(clientSubscriptions.map((item) => item.amountZar))
   );
   const projectedRevenueByMentorPrice = toCurrencyNumber(keysSoldThisMonth * robotPricePerKey);
+  const goalRevenueAtTarget = toCurrencyNumber(monthlyKeyTarget * robotPricePerKey);
   const targetRemaining = Math.max(monthlyKeyTarget - keysSoldThisMonth, 0);
   const targetProgressPercent =
     monthlyKeyTarget > 0 ? Math.min(100, Math.round((keysSoldThisMonth / monthlyKeyTarget) * 100)) : 0;
@@ -1370,12 +1384,15 @@ function buildOperatorDashboard(userId, now) {
       activeSubscribers,
     },
     businessMetrics: {
+      businessCurrency,
+      currencySymbol,
       robotPricePerKey,
       monthlyKeyTarget,
       keysSoldThisMonth,
       monthlyRevenue,
       estimatedTotalRevenue,
       projectedRevenueByMentorPrice,
+      goalRevenueAtTarget,
       targetRemaining,
       targetProgressPercent,
       targetReached: monthlyKeyTarget > 0 && keysSoldThisMonth >= monthlyKeyTarget,
