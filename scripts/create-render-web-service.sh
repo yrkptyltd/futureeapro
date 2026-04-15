@@ -155,8 +155,8 @@ main() {
     local created_json
     created_json="$(api_post '/services' "$payload")"
 
-    service_id="$(jq -r '.id // empty' <<<"$created_json")"
-    service_url="$(jq -r '.serviceDetails.url // empty' <<<"$created_json")"
+    service_id="$(jq -r '.id // .service.id // empty' <<<"$created_json")"
+    service_url="$(jq -r '.serviceDetails.url // .service.serviceDetails.url // empty' <<<"$created_json")"
 
     if [[ -z "$service_id" ]]; then
       echo "Render service creation failed. Response:" >&2
