@@ -573,10 +573,21 @@ body::before {
   border-color: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
+.sidebar-link.active {
+  background: color-mix(in srgb, var(--primary) 23%, transparent);
+  border-color: color-mix(in srgb, var(--accent-pink) 56%, transparent);
+}
+
 .sidebar-link:hover .nav-icon {
   color: #ffeff3;
   border-color: color-mix(in srgb, var(--accent-pink) 58%, transparent);
   background: color-mix(in srgb, var(--accent-pink) 23%, transparent);
+}
+
+.sidebar-link.active .nav-icon {
+  color: #fff4f6;
+  border-color: color-mix(in srgb, var(--accent-pink) 62%, transparent);
+  background: color-mix(in srgb, var(--accent-pink) 28%, transparent);
 }
 
 .mentor-main {
@@ -1005,9 +1016,123 @@ td {
   padding-left: 1.15rem;
 }
 
+.key-list {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
 .action-stack {
   display: grid;
   gap: 0.45rem;
+}
+
+.section-hidden {
+  display: none !important;
+}
+
+.key-entry {
+  margin-bottom: 0.5rem;
+}
+
+.key-copy-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.key-copy-input {
+  width: 120px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.users-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.user-card {
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  padding: 0.75rem 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.user-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.user-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.user-card-head .hint {
+  margin: 0.18rem 0 0;
+  font-size: 0.84rem;
+}
+
+.user-card-badges.clean {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+}
+
+.user-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.user-metrics article {
+  border: 1px solid color-mix(in srgb, var(--secondary) 32%, transparent);
+  border-radius: 10px;
+  padding: 0.45rem 0.5rem;
+  background: rgba(10, 10, 14, 0.42);
+}
+
+.user-metrics article span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.user-metrics article strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+}
+
+.inline-form.row.compact {
+  margin-top: 0.25rem;
+  align-items: stretch;
+}
+
+.inline-form.row.compact .limit-input {
+  width: 88px;
+}
+
+.user-actions-row {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.user-actions-row .text-link {
+  font-weight: 700;
 }
 
 code {
@@ -2324,8 +2449,18 @@ code {
   .panel-grid,
   .clean-grid,
   .stats-grid,
-  .row-fields {
+  .row-fields,
+  .user-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .user-card-head {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .user-card-badges.clean {
+    justify-items: start;
   }
 
   .site-header {

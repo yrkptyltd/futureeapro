@@ -1,6 +1,7 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const nodemailer = require('nodemailer');
 const {
   ensureDataFile,
   ensureMentorPortalIds,
@@ -58,6 +59,15 @@ const CLIENT_PLANS = {
   year_1: { code: 'year_1', label: '1 Year', durationMonths: 12, amountZar: 4599 },
 };
 const CLIENT_PLAN_LIST = Object.values(CLIENT_PLANS);
+const LICENSE_KEY_DURATIONS = {
+  days_3: { code: 'days_3', label: '3 Days', mode: 'days', value: 3 },
+  month_1: { code: 'month_1', label: '1 Month', mode: 'months', value: 1 },
+  month_3: { code: 'month_3', label: '3 Months', mode: 'months', value: 3 },
+  month_6: { code: 'month_6', label: '6 Months', mode: 'months', value: 6 },
+  year_1: { code: 'year_1', label: '1 Year', mode: 'months', value: 12 },
+  lifetime: { code: 'lifetime', label: 'Lifetime (∞)', mode: 'lifetime', value: 0 },
+};
+const LICENSE_KEY_DURATION_LIST = Object.values(LICENSE_KEY_DURATIONS);
 const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'metrader', 'details', 'settings'];
 const QUOTE_SYMBOLS = [
   '.DER30.',
@@ -159,6 +169,7 @@ const LEGACY_INITIAL_THEME = {
   bgEnd: '#2a0038',
   glow: '#ff5eea',
 };
+let cachedLicenseEmailTransporter = null;
 
 ensureDataFile();
 ensureMentorPortalIds();
@@ -504,6 +515,14 @@ app.post('/client/unlock', (req, res) => {
     return res.redirect('/client/unlock');
   }
 
+  if (licenseRecord.expiresAt) {
+    const expiresAt = new Date(licenseRecord.expiresAt);
+    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+      setFlash(req, 'error', 'This license key has expired. Ask your mentor for a new one.');
+      return res.redirect('/client/unlock');
+    }
+  }
+
   const startedAt = new Date();
   const endsAt = addMonths(startedAt, plan.durationMonths);
   const subscription = createClientSubscription({
@@ -513,6 +532,11 @@ app.post('/client/unlock', (req, res) => {
     planCode: plan.code,
     durationMonths: plan.durationMonths,
     amountZar: plan.amountZar,
+    robotId: licenseRecord.robotId || null,
+    robotName: licenseRecord.robotName || '',
+    licenseDurationCode: licenseRecord.durationCode || '',
+    licenseDurationLabel: licenseRecord.durationLabel || '',
+    licenseKeyExpiresAt: licenseRecord.expiresAt || null,
     licenseKey: licenseRecord.key,
     licenseNumber: licenseRecord.licenseNumber,
     startedAt: startedAt.toISOString(),
@@ -542,7 +566,7 @@ app.get('/client/success/:subscriptionId', (req, res) => {
   const mentor = getUserById(subscription.mentorId);
   const plan = getClientPlan(subscription.planCode);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickFeaturedRobot(mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
   return res.render('client-success', {
     title: 'Subscription Complete',
     subscription,
@@ -566,7 +590,7 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
 
   const mentor = getUserById(subscription.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickFeaturedRobot(mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
   const plan = getClientPlan(subscription.planCode);
   const requestedSection = String(req.query.section || 'home').trim().toLowerCase();
   const activeSection = CLIENT_ROBOT_SECTIONS.includes(requestedSection) ? requestedSection : 'home';
@@ -609,7 +633,7 @@ app.post('/client/robot/:subscriptionId/symbols/allowed', (req, res) => {
 
   const mentor = getUserById(subscription.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickFeaturedRobot(mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
   const symbols = getMentorAvailableSymbols(featuredRobot);
   const validSymbolSet = new Set(symbols);
   const rawSymbols = req.body && req.body.symbols;
@@ -725,6 +749,7 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), (req, res) => {
     dashboardTotals: dashboard.dashboardTotals,
     businessMetrics: dashboard.businessMetrics,
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
+    licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
   });
 });
 
@@ -830,46 +855,84 @@ app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), 
   return res.redirect('/mentor/dashboard#my-robots');
 });
 
-app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), (req, res) => {
+app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), async (req, res) => {
   const body = req.body || {};
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#client-keys');
   }
 
   const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
   const totalGenerated = licenseKeys.length;
   const reservedClientEmail = normalizeEmail(body.clientEmail);
+  const robotId = String(body.robotId || '').trim();
+  const durationOption = getLicenseDurationOption(body.durationCode);
+  const robot = getRobotById(robotId);
 
-  if (reservedClientEmail && !reservedClientEmail.includes('@')) {
-    setFlash(req, 'error', 'Reserved client email must be valid.');
+  if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
+    setFlash(req, 'error', 'Client email is required and must be valid.');
+    return res.redirect('/mentor/dashboard#client-keys');
+  }
+
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Choose a valid expert advisor (robot) first.');
+    return res.redirect('/mentor/dashboard#client-keys');
+  }
+
+  if (!durationOption) {
+    setFlash(req, 'error', 'Choose a valid key duration.');
     return res.redirect('/mentor/dashboard#client-keys');
   }
 
   if (totalGenerated >= mentor.licenseKeyLimit) {
     setFlash(req, 'error', 'License limit reached. Ask the superhost to increase your limit.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#client-keys');
   }
 
+  const createdAt = new Date();
+  const expiresAt = calculateLicenseKeyExpiresAt(createdAt, durationOption);
   const createdKey = createLicenseKey({
     mentorId: req.currentUser.id,
     status: 'available',
-    reservedClientEmail: reservedClientEmail || null,
+    reservedClientEmail,
+    robotId: robot.id,
+    robotName: robot.name,
+    durationCode: durationOption.code,
+    durationLabel: durationOption.label,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
   });
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#client-keys');
   }
 
-  if (reservedClientEmail) {
+  const emailResult = await sendLicenseKeyEmail({
+    mentorName: mentor.name,
+    mentorEmail: mentor.email,
+    mentorPortalId: mentor.mentorPortalId,
+    clientEmail: reservedClientEmail,
+    key: createdKey.key,
+    robotName: robot.name,
+    durationLabel: durationOption.label,
+    expiresAt: createdKey.expiresAt,
+  });
+
+  if (emailResult.sent) {
+    updateLicenseKey(createdKey.id, {
+      emailSentAt: new Date().toISOString(),
+    });
     setFlash(
       req,
       'success',
-      `New client key generated: ${createdKey.key} (reserved for ${reservedClientEmail}).`
+      `Key ${createdKey.key} generated for ${reservedClientEmail}, emailed automatically, and ready to copy from dashboard.`
     );
   } else {
-    setFlash(req, 'success', `New client key generated: ${createdKey.key}`);
+    setFlash(
+      req,
+      'success',
+      `Key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
+    );
   }
   return res.redirect('/mentor/dashboard#client-keys');
 });
@@ -901,6 +964,7 @@ app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('men
 
 app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, res) => {
   const now = new Date();
+  const currentSection = normalizeSuperhostDashboardSection(_req.query && _req.query.section);
   const superhostLab = buildOperatorDashboard(_req.currentUser.id, now);
   const mentors = listMentors().map((mentor) => {
     const robots = listRobotsByMentor(mentor.id);
@@ -933,6 +997,8 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, re
     superhostLab,
     platformTotals,
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
+    currentSection,
+    licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
   });
 });
 
@@ -944,12 +1010,12 @@ app.post('/superhost/business-settings', requireAuth, requireRole('superhost'), 
 
   if (!Number.isFinite(robotPricePerKey) || robotPricePerKey < 0) {
     setFlash(req, 'error', 'Robot price must be a non-negative number.');
-    return res.redirect('/superhost/dashboard#track-business');
+    return res.redirect('/superhost/dashboard?section=track-business#track-business');
   }
 
   if (!Number.isInteger(monthlyKeyTarget) || monthlyKeyTarget < 0) {
     setFlash(req, 'error', 'Monthly key target must be a non-negative whole number.');
-    return res.redirect('/superhost/dashboard#track-business');
+    return res.redirect('/superhost/dashboard?section=track-business#track-business');
   }
 
   updateUser(req.currentUser.id, {
@@ -959,7 +1025,7 @@ app.post('/superhost/business-settings', requireAuth, requireRole('superhost'), 
   });
 
   setFlash(req, 'success', 'Superhost lab business settings updated.');
-  return res.redirect('/superhost/dashboard#track-business');
+  return res.redirect('/superhost/dashboard?section=track-business#track-business');
 });
 
 app.post('/superhost/profile', requireAuth, requireRole('superhost'), (req, res) => {
@@ -973,7 +1039,7 @@ app.post('/superhost/profile', requireAuth, requireRole('superhost'), (req, res)
   });
 
   setFlash(req, 'success', 'Superhost lab profile updated.');
-  return res.redirect('/superhost/dashboard#my-profile');
+  return res.redirect('/superhost/dashboard?section=my-profile#my-profile');
 });
 
 app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) => {
@@ -981,13 +1047,13 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
     setFlash(req, 'error', 'Superhost lab subscription is inactive.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
   }
 
   const name = String(body.name || '').trim();
   if (!name) {
     setFlash(req, 'error', 'Robot name is required.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
   }
 
   const parseNumber = (value, fallback = 0) => {
@@ -1013,20 +1079,20 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
   });
 
   setFlash(req, 'success', 'Superhost test robot profile created.');
-  return res.redirect('/superhost/dashboard#create-robot');
+  return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
 });
 
 app.post('/superhost/robots/:robotId/symbols', requireAuth, requireRole('superhost'), (req, res) => {
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const symbols = parseSymbolsInput(req.body && req.body.allowedSymbols);
   if (!symbols.length) {
     setFlash(req, 'error', 'Please provide at least one valid symbol.');
-    return res.redirect('/superhost/dashboard#my-robots');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   updateRobot(robot.id, {
@@ -1034,63 +1100,101 @@ app.post('/superhost/robots/:robotId/symbols', requireAuth, requireRole('superho
   });
 
   setFlash(req, 'success', `Allowed symbols updated for ${robot.name}.`);
-  return res.redirect('/superhost/dashboard#my-robots');
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
-app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost'), (req, res) => {
+app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost'), async (req, res) => {
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
     setFlash(req, 'error', 'Superhost lab subscription is inactive.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
   }
 
   const body = req.body || {};
   const reservedClientEmail = normalizeEmail(body.clientEmail);
+  const robotId = String(body.robotId || '').trim();
+  const durationOption = getLicenseDurationOption(body.durationCode);
+  const robot = getRobotById(robotId);
   const totalGenerated = listLicenseKeysByMentor(req.currentUser.id).length;
-  if (reservedClientEmail && !reservedClientEmail.includes('@')) {
-    setFlash(req, 'error', 'Reserved client email must be valid.');
-    return res.redirect('/superhost/dashboard#client-keys');
+  if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
+    setFlash(req, 'error', 'Client email is required and must be valid.');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+  }
+
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Choose a valid expert advisor (robot).');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+  }
+
+  if (!durationOption) {
+    setFlash(req, 'error', 'Choose a valid key duration.');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
   }
 
   if (totalGenerated >= superhost.licenseKeyLimit) {
     setFlash(req, 'error', 'You reached your current superhost test key limit.');
-    return res.redirect('/superhost/dashboard#client-keys');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
   }
 
+  const createdAt = new Date();
+  const expiresAt = calculateLicenseKeyExpiresAt(createdAt, durationOption);
   const createdKey = createLicenseKey({
     mentorId: req.currentUser.id,
     status: 'available',
-    reservedClientEmail: reservedClientEmail || null,
+    reservedClientEmail,
+    robotId: robot.id,
+    robotName: robot.name,
+    durationCode: durationOption.code,
+    durationLabel: durationOption.label,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
   });
 
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/superhost/dashboard#client-keys');
+    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
   }
 
-  if (reservedClientEmail) {
+  const emailResult = await sendLicenseKeyEmail({
+    mentorName: superhost.name,
+    mentorEmail: superhost.email,
+    mentorPortalId: superhost.mentorPortalId || 'SUPERHOST',
+    clientEmail: reservedClientEmail,
+    key: createdKey.key,
+    robotName: robot.name,
+    durationLabel: durationOption.label,
+    expiresAt: createdKey.expiresAt,
+  });
+
+  if (emailResult.sent) {
+    updateLicenseKey(createdKey.id, {
+      emailSentAt: new Date().toISOString(),
+    });
     setFlash(
       req,
       'success',
-      `New superhost test key generated: ${createdKey.key} (reserved for ${reservedClientEmail}).`
+      `New key ${createdKey.key} generated, emailed to ${reservedClientEmail}, and ready to copy from dashboard.`
     );
   } else {
-    setFlash(req, 'success', `New superhost test key generated: ${createdKey.key}`);
+    setFlash(
+      req,
+      'success',
+      `New key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
+    );
   }
-  return res.redirect('/superhost/dashboard#client-keys');
+  return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
 });
 
 app.post('/superhost/robots/:robotId/convert-mobile', requireAuth, requireRole('superhost'), (req, res) => {
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
     setFlash(req, 'error', 'Superhost lab subscription is inactive.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   updateRobot(robot.id, {
@@ -1102,7 +1206,7 @@ app.post('/superhost/robots/:robotId/convert-mobile', requireAuth, requireRole('
   });
 
   setFlash(req, 'success', `${robot.name} converted for mobile delivery (Android + iOS).`);
-  return res.redirect('/superhost/dashboard#my-robots');
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
 app.post('/superhost/theme', requireAuth, requireRole('superhost'), (req, res) => {
@@ -1112,7 +1216,7 @@ app.post('/superhost/theme', requireAuth, requireRole('superhost'), (req, res) =
   if (preset && THEME_PRESETS[preset]) {
     updatePortalTheme(THEME_PRESETS[preset].colors);
     setFlash(req, 'success', `${THEME_PRESETS[preset].label} theme applied.`);
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=portal-theme#portal-theme');
   }
 
   const themeUpdates = {
@@ -1127,7 +1231,7 @@ app.post('/superhost/theme', requireAuth, requireRole('superhost'), (req, res) =
 
   updatePortalTheme(themeUpdates);
   setFlash(req, 'success', 'Portal theme updated.');
-  return res.redirect('/superhost/dashboard');
+  return res.redirect('/superhost/dashboard?section=portal-theme#portal-theme');
 });
 
 app.get('/superhost/mentors/:mentorId', requireAuth, requireRole('superhost'), (req, res) => {
@@ -1135,7 +1239,7 @@ app.get('/superhost/mentors/:mentorId', requireAuth, requireRole('superhost'), (
 
   if (!details) {
     setFlash(req, 'error', 'Mentor not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=users#users');
   }
 
   return res.render('superhost-mentor-details', {
@@ -1148,7 +1252,7 @@ app.post('/superhost/mentors/:mentorId/approval', requireAuth, requireRole('supe
   const mentor = getUserById(req.params.mentorId);
   if (!mentor || mentor.role !== 'mentor') {
     setFlash(req, 'error', 'Mentor not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=users#users');
   }
 
   const body = req.body || {};
@@ -1157,14 +1261,14 @@ app.post('/superhost/mentors/:mentorId/approval', requireAuth, requireRole('supe
   updateUser(mentor.id, { approved });
 
   setFlash(req, 'success', approved ? `${mentor.email} approved.` : `${mentor.email} approval revoked.`);
-  return res.redirect('/superhost/dashboard');
+  return res.redirect('/superhost/dashboard?section=users#users');
 });
 
 app.post('/superhost/mentors/:mentorId/subscription', requireAuth, requireRole('superhost'), (req, res) => {
   const mentor = getUserById(req.params.mentorId);
   if (!mentor || mentor.role !== 'mentor') {
     setFlash(req, 'error', 'Mentor not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=users#users');
   }
 
   const body = req.body || {};
@@ -1179,26 +1283,26 @@ app.post('/superhost/mentors/:mentorId/subscription', requireAuth, requireRole('
       ? `${mentor.email} subscription reactivated/bypassed.`
       : `${mentor.email} subscription deactivated.`
   );
-  return res.redirect('/superhost/dashboard');
+  return res.redirect('/superhost/dashboard?section=users#users');
 });
 
 app.post('/superhost/mentors/:mentorId/license-limit', requireAuth, requireRole('superhost'), (req, res) => {
   const mentor = getUserById(req.params.mentorId);
   if (!mentor || mentor.role !== 'mentor') {
     setFlash(req, 'error', 'Mentor not found.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=users#users');
   }
 
   const body = req.body || {};
   const limit = Number(body.limit);
   if (!Number.isInteger(limit) || limit < 0) {
     setFlash(req, 'error', 'License key limit must be a non-negative integer.');
-    return res.redirect('/superhost/dashboard');
+    return res.redirect('/superhost/dashboard?section=users#users');
   }
 
   updateUser(mentor.id, { licenseKeyLimit: limit });
   setFlash(req, 'success', `License key limit updated for ${mentor.email}.`);
-  return res.redirect('/superhost/dashboard');
+  return res.redirect('/superhost/dashboard?section=users#users');
 });
 
 app.use((_req, res) => {
@@ -1230,6 +1334,26 @@ function requireRole(role) {
     }
     return next();
   };
+}
+
+function normalizeSuperhostDashboardSection(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const allowed = new Set([
+    'overview',
+    'users',
+    'my-profile',
+    'track-business',
+    'client-keys',
+    'create-robot',
+    'my-robots',
+    'portal-theme',
+  ]);
+
+  if (!allowed.has(normalized)) {
+    return 'overview';
+  }
+
+  return normalized;
 }
 
 function bootstrapSuperhost() {
@@ -1434,6 +1558,38 @@ function getClientPlan(planCode) {
   return CLIENT_PLANS[code] || null;
 }
 
+function getLicenseDurationOption(durationCode) {
+  const code = String(durationCode || '').trim();
+  return LICENSE_KEY_DURATIONS[code] || null;
+}
+
+function addDays(dateValue, dayCount) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+
+  const result = new Date(date);
+  result.setDate(result.getDate() + Number(dayCount || 0));
+  return result;
+}
+
+function calculateLicenseKeyExpiresAt(createdAt, durationOption) {
+  if (!durationOption || durationOption.mode === 'lifetime') {
+    return null;
+  }
+
+  if (durationOption.mode === 'days') {
+    return addDays(createdAt, durationOption.value);
+  }
+
+  if (durationOption.mode === 'months') {
+    return addMonths(createdAt, durationOption.value);
+  }
+
+  return null;
+}
+
 function addMonths(dateValue, monthCount) {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) {
@@ -1469,6 +1625,126 @@ function pickFeaturedRobot(robots) {
   }
 
   return robots[0];
+}
+
+function pickSubscriptionRobot(subscription, robots) {
+  if (!Array.isArray(robots) || !robots.length) {
+    return null;
+  }
+
+  const preferredId = String(subscription && subscription.robotId ? subscription.robotId : '').trim();
+  if (preferredId) {
+    const preferredRobot = robots.find((item) => item.id === preferredId);
+    if (preferredRobot) {
+      return preferredRobot;
+    }
+  }
+
+  return pickFeaturedRobot(robots);
+}
+
+function getLicenseEmailTransporter() {
+  if (cachedLicenseEmailTransporter) {
+    return cachedLicenseEmailTransporter;
+  }
+
+  const host = String(process.env.SMTP_HOST || '').trim();
+  if (!host) {
+    return null;
+  }
+
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = String(process.env.SMTP_SECURE || '').trim().toLowerCase() === 'true' || port === 465;
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').trim();
+
+  const config = {
+    host,
+    port: Number.isFinite(port) ? port : 587,
+    secure,
+  };
+
+  if (user && pass) {
+    config.auth = { user, pass };
+  }
+
+  cachedLicenseEmailTransporter = nodemailer.createTransport(config);
+  return cachedLicenseEmailTransporter;
+}
+
+async function sendLicenseKeyEmail(payload) {
+  const transporter = getLicenseEmailTransporter();
+  if (!transporter) {
+    return { sent: false, reason: 'email service not configured' };
+  }
+
+  const fromAddress =
+    String(process.env.SMTP_FROM || '').trim() ||
+    String(process.env.SMTP_USER || '').trim() ||
+    'no-reply@futureeapro.com';
+
+  const keyText = String(payload.key || '').trim();
+  const robotName = String(payload.robotName || 'Your Expert Advisor').trim();
+  const subject = `${APP_NAME} License Key - ${robotName}`;
+  const expiryText = payload.expiresAt
+    ? new Date(payload.expiresAt).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
+    : 'No expiry (Lifetime)';
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;background:#0b0c12;color:#f4f5f8;padding:24px;">
+      <div style="max-width:640px;margin:0 auto;border:1px solid #2b2f40;border-radius:14px;background:#11141d;padding:22px;">
+        <h1 style="margin:0 0 12px;font-size:22px;color:#ff6b76;">Future EA Pro License Key</h1>
+        <p style="margin:0 0 16px;color:#c8cedf;">Hello, your mentor has issued your Expert Advisor license key.</p>
+        <p style="margin:0 0 8px;"><strong>Mentor:</strong> ${escapeHtml(payload.mentorName || '')}</p>
+        <p style="margin:0 0 8px;"><strong>Mentor ID:</strong> ${escapeHtml(String(payload.mentorPortalId || ''))}</p>
+        <p style="margin:0 0 8px;"><strong>Expert Advisor:</strong> ${escapeHtml(robotName)}</p>
+        <p style="margin:0 0 8px;"><strong>Duration:</strong> ${escapeHtml(payload.durationLabel || '')}</p>
+        <p style="margin:0 0 18px;"><strong>Expires:</strong> ${escapeHtml(expiryText)}</p>
+        <div style="border:2px solid #ff7f88;border-radius:12px;background:#1a1e29;padding:16px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:12px;letter-spacing:1px;color:#9aa3bb;">YOUR LICENSE KEY</p>
+          <p style="margin:0;font-size:42px;line-height:1;font-weight:800;letter-spacing:2px;color:#ffffff;">${escapeHtml(keyText)}</p>
+        </div>
+        <p style="margin:16px 0 0;color:#c8cedf;">Open <a href=\"https://futureeapro.com/client\" style=\"color:#ff9aa3;\">futureeapro.com/client</a>, enter your mentor ID + email, then paste this key to unlock.</p>
+      </div>
+    </div>
+  `;
+
+  const text = [
+    `Future EA Pro License Key`,
+    ``,
+    `Mentor: ${payload.mentorName || ''}`,
+    `Mentor ID: ${payload.mentorPortalId || ''}`,
+    `Expert Advisor: ${robotName}`,
+    `Duration: ${payload.durationLabel || ''}`,
+    `Expires: ${expiryText}`,
+    ``,
+    `LICENSE KEY: ${keyText}`,
+    ``,
+    `Unlock at: https://futureeapro.com/client`,
+  ].join('\n');
+
+  try {
+    await transporter.sendMail({
+      from: fromAddress,
+      to: payload.clientEmail,
+      replyTo: payload.mentorEmail || undefined,
+      subject,
+      text,
+      html,
+    });
+    return { sent: true };
+  } catch (_error) {
+    return { sent: false, reason: 'email delivery failed' };
+  }
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function isLicenseKeyRedeemed(licenseKey) {

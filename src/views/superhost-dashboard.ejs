@@ -7,6 +7,7 @@
 <% const labRobots = lab.robots || []; %>
 <% const labLicenseKeys = lab.licenseKeys || []; %>
 <% const labActiveKeysUsed = lab.activeKeysUsed || 0; %>
+<% const activeSection = currentSection || 'overview'; %>
 
 <section class="dashboard-head dashboard-head-drawer">
   <div>
@@ -44,7 +45,7 @@
       </div>
     </div>
 
-    <a href="#my-profile" class="sidebar-profile">
+    <a href="/superhost/dashboard?section=my-profile#my-profile" class="sidebar-profile">
       <span class="sidebar-avatar"><%= (labAccount.name || 'S').charAt(0).toUpperCase() %></span>
       <span>
         <strong><%= labAccount.name %></strong>
@@ -55,130 +56,105 @@
 
     <div class="sidebar-group">
       <h2>Core</h2>
-      <a href="#overview" class="sidebar-link"><span class="nav-icon">DB</span>Dashboard</a>
-      <a href="#mentor-control" class="sidebar-link"><span class="nav-icon">MC</span>Mentor Control</a>
-      <a href="#track-business" class="sidebar-link"><span class="nav-icon">TS</span>Track Business</a>
+      <a href="/superhost/dashboard?section=overview#overview" class="sidebar-link <%= activeSection === 'overview' ? 'active' : '' %>"><span class="nav-icon">DB</span>Dashboard</a>
+      <a href="/superhost/dashboard?section=users#users" class="sidebar-link <%= activeSection === 'users' ? 'active' : '' %>"><span class="nav-icon">US</span>Users</a>
+      <a href="/superhost/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>"><span class="nav-icon">TS</span>Track Business</a>
     </div>
 
     <div class="sidebar-group">
       <h2>Lab</h2>
-      <a href="#client-keys" class="sidebar-link"><span class="nav-icon">KY</span>Generate Key</a>
-      <a href="#create-robot" class="sidebar-link"><span class="nav-icon">CR</span>Create Robot</a>
-      <a href="#my-robots" class="sidebar-link"><span class="nav-icon">EA</span>Manage EAs</a>
-      <a href="#portal-theme" class="sidebar-link"><span class="nav-icon">TH</span>Portal Theme</a>
-      <a href="#my-profile" class="sidebar-link"><span class="nav-icon">PF</span>My Profile</a>
+      <a href="/superhost/dashboard?section=client-keys#client-keys" class="sidebar-link <%= activeSection === 'client-keys' ? 'active' : '' %>"><span class="nav-icon">KY</span>Generate Key</a>
+      <a href="/superhost/dashboard?section=create-robot#create-robot" class="sidebar-link <%= activeSection === 'create-robot' ? 'active' : '' %>"><span class="nav-icon">CR</span>Create Robot</a>
+      <a href="/superhost/dashboard?section=my-robots#my-robots" class="sidebar-link <%= activeSection === 'my-robots' ? 'active' : '' %>"><span class="nav-icon">EA</span>Manage EAs</a>
+      <a href="/superhost/dashboard?section=portal-theme#portal-theme" class="sidebar-link <%= activeSection === 'portal-theme' ? 'active' : '' %>"><span class="nav-icon">TH</span>Portal Theme</a>
+      <a href="/superhost/dashboard?section=my-profile#my-profile" class="sidebar-link <%= activeSection === 'my-profile' ? 'active' : '' %>"><span class="nav-icon">PF</span>My Profile</a>
     </div>
   </aside>
 
   <div class="mentor-main">
-    <section class="totals-grid" id="overview">
+    <section class="totals-grid <%= activeSection === 'overview' ? '' : 'section-hidden' %>" id="overview">
       <article class="panel total-card">
         <h3>Total Keys</h3>
-        <p class="total-value"><%= labTotals.totalKeys %></p>
+        <p class="total-value"><%= platformTotals.totalKeys %></p>
       </article>
 
       <article class="panel total-card">
         <h3>Total Generated</h3>
-        <p class="total-value"><%= labTotals.totalGenerated %></p>
-      </article>
-
-      <article class="panel total-card">
-        <h3>Active Subscribers</h3>
-        <p class="total-value"><%= labTotals.activeSubscribers %></p>
-      </article>
-    </section>
-
-    <section class="totals-grid">
-      <article class="panel total-card">
-        <h3>Total Mentors</h3>
-        <p class="total-value"><%= platformTotals.totalMentors %></p>
-      </article>
-
-      <article class="panel total-card">
-        <h3>Platform Keys Generated</h3>
         <p class="total-value"><%= platformTotals.totalGenerated %></p>
       </article>
 
       <article class="panel total-card">
-        <h3>Platform Active Subs</h3>
+        <h3>Active Subscribers</h3>
         <p class="total-value"><%= platformTotals.activeSubscribers %></p>
       </article>
     </section>
 
-    <section class="panel-grid single" id="mentor-control">
+    <section class="panel-grid single <%= activeSection === 'users' ? '' : 'section-hidden' %>" id="users">
       <article class="panel">
-        <h2>Mentor Control Portal</h2>
+        <h2>Users</h2>
+        <p class="hint">Manage mentor signups, key limits, generated keys, and active paid subscribers.</p>
 
         <% if (!mentors.length) { %>
         <p class="hint">No mentors registered yet.</p>
         <% } else { %>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Mentor</th>
-                <th>Mentor ID</th>
-                <th>Approval</th>
-                <th>Subscription</th>
-                <th>Keys Used</th>
-                <th>Active Subscribers</th>
-                <th>Key Limit</th>
-                <th>Robots</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% mentors.forEach((mentor) => { %>
-              <tr>
-                <td>
-                  <strong><%= mentor.name %></strong><br />
-                  <span class="hint"><%= mentor.email %></span>
-                </td>
-                <td><strong><%= mentor.mentorPortalId || '-' %></strong></td>
-                <td><span class="pill <%= mentor.approved ? 'ok' : 'off' %>"><%= mentor.approved ? 'Approved' : 'Pending' %></span></td>
-                <td>
-                  <span class="pill <%= mentor.subscriptionActive ? 'ok' : 'off' %>">
-                    <%= mentor.subscriptionActive ? 'Active' : 'Inactive' %>
-                  </span>
-                </td>
-                <td><%= mentor.activeKeysUsed %> / <%= mentor.totalKeys %></td>
-                <td><%= mentor.activeSubscribers %></td>
-                <td><%= mentor.licenseKeyLimit %></td>
-                <td><%= mentor.robotsCount %></td>
-                <td>
-                  <div class="action-stack">
-                    <form action="/superhost/mentors/<%= mentor.id %>/approval" method="POST" class="inline-form">
-                      <input type="hidden" name="action" value="<%= mentor.approved ? 'revoke' : 'approve' %>" />
-                      <button type="submit" class="button mini <%= mentor.approved ? 'secondary' : '' %>">
-                        <%= mentor.approved ? 'Revoke' : 'Approve' %>
-                      </button>
-                    </form>
+        <div class="users-list">
+          <% mentors.forEach((mentor) => { %>
+          <article class="user-card">
+            <div class="user-card-head">
+              <div>
+                <h3><%= mentor.name %></h3>
+                <p class="hint"><%= mentor.email %></p>
+                <p class="hint">Mentor ID: <strong><%= mentor.mentorPortalId || '-' %></strong></p>
+              </div>
+              <div class="user-card-badges clean">
+                <span class="pill <%= mentor.approved ? 'ok' : 'off' %>"><%= mentor.approved ? 'Approved' : 'Pending' %></span>
+                <span class="pill <%= mentor.subscriptionActive ? 'ok' : 'off' %>"><%= mentor.subscriptionActive ? 'Sub Active' : 'Sub Inactive' %></span>
+              </div>
+            </div>
 
-                    <form action="/superhost/mentors/<%= mentor.id %>/subscription" method="POST" class="inline-form">
-                      <input type="hidden" name="action" value="<%= mentor.subscriptionActive ? 'deactivate' : 'activate' %>" />
-                      <button type="submit" class="button mini secondary">
-                        <%= mentor.subscriptionActive ? 'Deactivate Sub' : 'Reactivate Sub' %>
-                      </button>
-                    </form>
+            <div class="user-metrics">
+              <article>
+                <span>Key Limit</span>
+                <form action="/superhost/mentors/<%= mentor.id %>/license-limit" method="POST" class="inline-form row compact">
+                  <input type="number" name="limit" min="0" value="<%= mentor.licenseKeyLimit %>" class="limit-input" required />
+                  <button type="submit" class="button mini">Save</button>
+                </form>
+              </article>
+              <article>
+                <span>Keys Generated</span>
+                <strong><%= mentor.totalKeys %></strong>
+              </article>
+              <article>
+                <span>Active Subscribers</span>
+                <strong><%= mentor.activeSubscribers %></strong>
+              </article>
+            </div>
 
-                    <form action="/superhost/mentors/<%= mentor.id %>/license-limit" method="POST" class="inline-form row">
-                      <input type="number" name="limit" min="0" value="<%= mentor.licenseKeyLimit %>" class="limit-input" required />
-                      <button type="submit" class="button mini">Set Limit</button>
-                    </form>
+            <div class="user-actions-row">
+              <form action="/superhost/mentors/<%= mentor.id %>/approval" method="POST" class="inline-form">
+                <input type="hidden" name="action" value="<%= mentor.approved ? 'revoke' : 'approve' %>" />
+                <button type="submit" class="button mini <%= mentor.approved ? 'secondary' : '' %>">
+                  <%= mentor.approved ? 'Revoke Approval' : 'Approve Mentor' %>
+                </button>
+              </form>
 
-                    <a class="text-link" href="/superhost/mentors/<%= mentor.id %>">View Full Details</a>
-                  </div>
-                </td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
+              <form action="/superhost/mentors/<%= mentor.id %>/subscription" method="POST" class="inline-form">
+                <input type="hidden" name="action" value="<%= mentor.subscriptionActive ? 'deactivate' : 'activate' %>" />
+                <button type="submit" class="button mini secondary">
+                  <%= mentor.subscriptionActive ? 'Deactivate Sub' : 'Reactivate Sub' %>
+                </button>
+              </form>
+
+              <a class="text-link" href="/superhost/mentors/<%= mentor.id %>">View Full Details</a>
+            </div>
+          </article>
+          <% }) %>
         </div>
         <% } %>
       </article>
     </section>
 
-    <section class="panel-grid single" id="my-profile">
+    <section class="panel-grid single <%= activeSection === 'my-profile' ? '' : 'section-hidden' %>" id="my-profile">
       <article class="panel">
         <h2>My Profile (Superhost Test Lab)</h2>
         <p class="hint">Profile details are for portal use only.</p>
@@ -218,7 +194,7 @@
       </article>
     </section>
 
-    <section class="panel-grid single" id="track-business">
+    <section class="panel-grid single <%= activeSection === 'track-business' ? '' : 'section-hidden' %>" id="track-business">
       <article class="panel">
         <h2>Track My Business</h2>
         <p class="hint">Mentor-style metrics for superhost testing and benchmarking.</p>
@@ -282,8 +258,8 @@
       </article>
     </section>
 
-    <section class="stats-grid">
-      <article class="panel" id="client-keys">
+    <section class="stats-grid <%= activeSection === 'client-keys' ? '' : 'section-hidden' %>" id="client-keys">
+      <article class="panel">
         <h2>Client Keys (Superhost Test Lab)</h2>
         <p><strong>Email:</strong> <%= labAccount.email %></p>
         <p><strong>Lab ID:</strong> <%= labAccount.mentorPortalId || 'SUPERHOST' %></p>
@@ -292,19 +268,53 @@
 
         <form action="/superhost/license-keys/generate" method="POST" class="stack-form">
           <label>
-            Reserve for Client Email (optional)
-            <input type="email" name="clientEmail" placeholder="client@example.com" />
+            Client Email
+            <input type="email" name="clientEmail" placeholder="client@example.com" required />
           </label>
-          <button type="submit" class="button">Generate Client Key</button>
+
+          <label>
+            Expert Advisor (Robot)
+            <select name="robotId" required>
+              <option value="">Select robot</option>
+              <% labRobots.forEach((robot) => { %>
+              <option value="<%= robot.id %>"><%= robot.name %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label>
+            License Key Duration
+            <select name="durationCode" required>
+              <option value="">Select duration</option>
+              <% licenseDurationOptions.forEach((item) => { %>
+              <option value="<%= item.code %>"><%= item.label %></option>
+              <% }) %>
+            </select>
+          </label>
+          <button type="submit" class="button" <%= labRobots.length ? '' : 'disabled' %>>
+            Generate & Email Key
+          </button>
         </form>
+
+        <% if (!labRobots.length) { %>
+        <p class="hint">Create at least one robot first before generating keys.</p>
+        <% } %>
 
         <% if (!labLicenseKeys.length) { %>
         <p class="hint">No client keys generated yet.</p>
         <% } else { %>
-        <ul class="list">
+        <ul class="list key-list">
           <% labLicenseKeys.forEach((item) => { %>
-          <li>
-            <code><%= item.key %></code>
+          <li class="key-entry">
+            <div class="key-copy-row">
+              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
+              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+            </div>
+            <p class="hint">
+              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
+              EA: <strong><%= item.robotName || 'Not set' %></strong> |
+              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
+            </p>
             <% if (item.redeemedAt || item.status === 'redeemed') { %>
             <span class="pill ok">redeemed</span>
             <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
@@ -321,7 +331,7 @@
       </article>
     </section>
 
-    <section class="panel-grid single" id="create-robot">
+    <section class="panel-grid single <%= activeSection === 'create-robot' ? '' : 'section-hidden' %>" id="create-robot">
       <article class="panel">
         <h2>Create Robot Profile (Superhost Test Lab)</h2>
 
@@ -397,7 +407,7 @@
       </article>
     </section>
 
-    <section class="panel-grid single" id="my-robots">
+    <section class="panel-grid single <%= activeSection === 'my-robots' ? '' : 'section-hidden' %>" id="my-robots">
       <article class="panel">
         <h2>Your Robot Profiles (Superhost Test Lab)</h2>
 
@@ -466,7 +476,7 @@
       </article>
     </section>
 
-    <section class="panel-grid single" id="portal-theme">
+    <section class="panel-grid single <%= activeSection === 'portal-theme' ? '' : 'section-hidden' %>" id="portal-theme">
       <article class="panel">
         <h2>Portal Theme</h2>
         <p class="hint">Theme controls moved lower so stats and operations show first.</p>

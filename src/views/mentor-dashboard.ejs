@@ -233,23 +233,57 @@
       <article class="panel" id="client-keys">
         <h2>Client Keys</h2>
         <p class="hint">
-          Generate unique keys for clients. After clients subscribe, they must enter this key to unlock robot access.
+          Issue a key by client email, EA, and duration. The key is emailed automatically and can also be copied here.
         </p>
         <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
           <label>
-            Reserve for Client Email (optional)
-            <input type="email" name="clientEmail" placeholder="client@example.com" />
+            Client Email
+            <input type="email" name="clientEmail" placeholder="client@example.com" required />
           </label>
-          <button type="submit" class="button">Generate Client Key</button>
+
+          <label>
+            Expert Advisor (Robot)
+            <select name="robotId" required>
+              <option value="">Select robot</option>
+              <% robots.forEach((robot) => { %>
+              <option value="<%= robot.id %>"><%= robot.name %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label>
+            License Key Duration
+            <select name="durationCode" required>
+              <option value="">Select duration</option>
+              <% licenseDurationOptions.forEach((item) => { %>
+              <option value="<%= item.code %>"><%= item.label %></option>
+              <% }) %>
+            </select>
+          </label>
+          <button type="submit" class="button" <%= robots.length ? '' : 'disabled' %>>
+            Generate & Email Key
+          </button>
         </form>
+
+        <% if (!robots.length) { %>
+        <p class="hint">Create at least one robot first before generating license keys.</p>
+        <% } %>
 
         <% if (!licenseKeys.length) { %>
         <p class="hint">No client keys generated yet.</p>
         <% } else { %>
-        <ul class="list">
+        <ul class="list key-list">
           <% licenseKeys.forEach((item) => { %>
-          <li>
-            <code><%= item.key %></code>
+          <li class="key-entry">
+            <div class="key-copy-row">
+              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
+              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+            </div>
+            <p class="hint">
+              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
+              EA: <strong><%= item.robotName || 'Not set' %></strong> |
+              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
+            </p>
             <% if (item.redeemedAt || item.status === 'redeemed') { %>
             <span class="pill ok">redeemed</span>
             <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
