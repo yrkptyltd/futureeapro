@@ -393,30 +393,157 @@ body::before {
 
 .mentor-sidebar {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.75rem;
   position: sticky;
   top: 84px;
+  padding: 0.85rem;
 }
 
-.mentor-sidebar h2 {
-  margin: 0 0 0.2rem;
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0.3rem 0.15rem;
+}
+
+.sidebar-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff5f7;
+  border: 1px solid color-mix(in srgb, var(--primary) 48%, transparent);
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--primary) 66%, #09090b),
+    color-mix(in srgb, var(--accent-pink) 60%, #09090b)
+  );
+  box-shadow: 0 0 16px color-mix(in srgb, var(--glow) 34%, transparent);
+}
+
+.sidebar-brand-title {
+  margin: 0;
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-brand-subtitle {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.73rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  border-radius: 12px;
+  padding: 0.55rem 0.6rem;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.sidebar-profile:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent-pink) 62%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-pink) 35%, transparent);
+}
+
+.sidebar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--secondary) 40%, transparent);
+  background: color-mix(in srgb, var(--secondary) 18%, transparent);
+}
+
+.sidebar-profile strong {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.1;
+}
+
+.sidebar-profile small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 0.14rem;
+}
+
+.sidebar-chevron {
+  margin-left: auto;
+  color: var(--muted);
   font-size: 1rem;
 }
 
-.mentor-sidebar a {
-  text-decoration: none;
-  color: var(--text);
-  font-weight: 700;
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
-  border-radius: 10px;
-  padding: 0.5rem 0.65rem;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+.sidebar-group {
+  display: grid;
+  gap: 0.42rem;
 }
 
-.mentor-sidebar a:hover {
+.sidebar-group h2 {
+  margin: 0.28rem 0 0.08rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.46rem 0.55rem;
+  background: transparent;
+  transition: border-color 140ms ease, transform 140ms ease, background-color 140ms ease;
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  color: var(--secondary);
+  border: 1px solid color-mix(in srgb, var(--secondary) 34%, transparent);
+  background: color-mix(in srgb, var(--secondary) 14%, transparent);
+  flex: 0 0 24px;
+}
+
+.sidebar-link:hover {
   transform: translateY(-1px);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-pink) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.sidebar-link:hover .nav-icon {
+  color: #ffeff3;
+  border-color: color-mix(in srgb, var(--accent-pink) 58%, transparent);
+  background: color-mix(in srgb, var(--accent-pink) 23%, transparent);
 }
 
 .mentor-main {

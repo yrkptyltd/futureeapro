@@ -17,15 +17,38 @@
 
 <section class="mentor-layout">
   <aside class="mentor-sidebar">
-    <h2>Menu</h2>
-    <a href="#overview">Overview</a>
-    <a href="#mentor-control">Mentor Control</a>
-    <a href="#my-profile">My Profile</a>
-    <a href="#track-business">Track My Business</a>
-    <a href="#client-keys">Client Keys</a>
-    <a href="#create-robot">Create Robot</a>
-    <a href="#my-robots">My Robots</a>
-    <a href="#portal-theme">Portal Theme</a>
+    <div class="sidebar-brand">
+      <span class="sidebar-logo">F</span>
+      <div>
+        <p class="sidebar-brand-title">Future EA Pro</p>
+        <p class="sidebar-brand-subtitle">Superhost Portal</p>
+      </div>
+    </div>
+
+    <a href="#my-profile" class="sidebar-profile">
+      <span class="sidebar-avatar"><%= (labAccount.name || 'S').charAt(0).toUpperCase() %></span>
+      <span>
+        <strong><%= labAccount.name %></strong>
+        <small>Superhost</small>
+      </span>
+      <span class="sidebar-chevron">></span>
+    </a>
+
+    <div class="sidebar-group">
+      <h2>Core</h2>
+      <a href="#overview" class="sidebar-link"><span class="nav-icon">DB</span>Dashboard</a>
+      <a href="#mentor-control" class="sidebar-link"><span class="nav-icon">MC</span>Mentor Control</a>
+      <a href="#track-business" class="sidebar-link"><span class="nav-icon">TS</span>Track Business</a>
+    </div>
+
+    <div class="sidebar-group">
+      <h2>Lab</h2>
+      <a href="#client-keys" class="sidebar-link"><span class="nav-icon">KY</span>Generate Key</a>
+      <a href="#create-robot" class="sidebar-link"><span class="nav-icon">CR</span>Create Robot</a>
+      <a href="#my-robots" class="sidebar-link"><span class="nav-icon">EA</span>Manage EAs</a>
+      <a href="#portal-theme" class="sidebar-link"><span class="nav-icon">TH</span>Portal Theme</a>
+      <a href="#my-profile" class="sidebar-link"><span class="nav-icon">PF</span>My Profile</a>
+    </div>
   </aside>
 
   <div class="mentor-main">
