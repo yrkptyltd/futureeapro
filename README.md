@@ -59,7 +59,7 @@ bash scripts/create-render-web-service.sh
 Optional environment variables:
 - `RENDER_OWNER_ID` (or use `RENDER_WORKSPACE_NAME` / `RENDER_WORKSPACE_EMAIL`)
 - `RENDER_BRANCH` (default: `main`)
-- `RENDER_PLAN` (default: `starter`)
+- `RENDER_PLAN` (default: `free`)
 - `RENDER_REGION` (default: `oregon`)
 - `RENDER_BUILD_COMMAND` (default: `npm install`)
 - `RENDER_START_COMMAND` (default: `npm start`)

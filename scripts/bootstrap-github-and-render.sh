@@ -110,7 +110,8 @@ push_to_github() {
   local branch="$3"
 
   local remote_url="https://github.com/${owner}/${repo}.git"
-  local auth_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${owner}/${repo}.git"
+  local auth_b64
+  auth_b64="$(printf "x-access-token:%s" "$GITHUB_TOKEN" | base64 | tr -d '\n')"
 
   cd "$PROJECT_ROOT"
 
@@ -120,7 +121,8 @@ push_to_github() {
     git remote add origin "$remote_url"
   fi
 
-  git push -u "$auth_url" "$branch"
+  git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth_b64}" \
+    push -u origin "$branch"
   echo "GitHub push complete: ${remote_url}"
 }
 

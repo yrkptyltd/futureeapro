@@ -75,7 +75,7 @@ main() {
 
   local service_name="${RENDER_SERVICE_NAME:-futureeapro-web}"
   local branch="${RENDER_BRANCH:-main}"
-  local plan="${RENDER_PLAN:-starter}"
+  local plan="${RENDER_PLAN:-free}"
   local region="${RENDER_REGION:-oregon}"
   local runtime="${RENDER_RUNTIME:-node}"
   local auto_deploy="${RENDER_AUTO_DEPLOY:-yes}"
