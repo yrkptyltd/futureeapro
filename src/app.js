@@ -246,7 +246,7 @@ app.post('/signup', (req, res) => {
     setFlash(
       req,
       'success',
-      'Account created. Wait for superhost approval and subscription activation before full access.'
+      'Account registration pending. Please check again after 5-15 minutes.'
     );
   }
 
@@ -278,7 +278,7 @@ app.post('/signin', (req, res) => {
   }
 
   if (user.role === 'mentor' && !user.approved) {
-    setFlash(req, 'error', 'Your mentor account is pending superhost approval.');
+    setFlash(req, 'error', 'Account registration pending. Please check again after 5-15 minutes.');
     return res.redirect('/signin');
   }
 
@@ -312,7 +312,9 @@ app.get('/client', (_req, res) => {
 });
 
 app.get('/download/android', (_req, res) => {
-  return res.redirect('/client');
+  return res.render('download-android', {
+    title: 'Download Android App',
+  });
 });
 
 app.post('/client/start', (req, res) => {
