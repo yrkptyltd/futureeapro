@@ -1,0 +1,52 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-head">
+  <h1>Platform Overview</h1>
+  <p>Detailed modules are moved here to keep the landing page clean.</p>
+</section>
+
+<section class="panel-grid">
+  <article class="panel">
+    <h2>Client App</h2>
+    <ul>
+      <li>First page asks for Mentor ID + client email.</li>
+      <li>Plans: 1 month (R599), 3 months (R1499), 1 year (R4599).</li>
+      <li>Subscription generates sequential license keys: 100, 101, 102...</li>
+    </ul>
+    <a href="/client" class="text-link">Open Client App</a>
+  </article>
+
+  <article class="panel">
+    <h2>Mentor Portal</h2>
+    <ul>
+      <li>Mentor dashboard with totals and sidebar menu.</li>
+      <li>Create robot profiles, key stats, and mobile conversion.</li>
+      <li>Track business with monthly targets and revenue metrics.</li>
+    </ul>
+    <a href="/signin" class="text-link">Open Mentor Sign In</a>
+  </article>
+
+  <article class="panel">
+    <h2>Superhost Control</h2>
+    <ul>
+      <li>Approve mentors and reactivate/deactivate subscriptions.</li>
+      <li>Manage license limits and view full mentor details.</li>
+      <li>Customize portal theme with neon presets and manual colors.</li>
+    </ul>
+    <p class="hint">Superhost email: <strong><%= superhostEmail %></strong></p>
+  </article>
+
+  <article class="panel">
+    <h2>Neon Themes</h2>
+    <ul>
+      <li>Dope Red (Default)</li>
+      <li>Neon Rose</li>
+      <li>Acid Lime</li>
+      <li>Ember Flux</li>
+      <li>Cyber Sunset</li>
+    </ul>
+    <p class="hint">Choose a preset in the superhost dashboard or fine-tune every color.</p>
+  </article>
+</section>
+
+<%- include('partials/bottom') %>

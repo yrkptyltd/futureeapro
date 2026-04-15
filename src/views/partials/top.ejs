@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-face-style="square">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= title %> | <%= appName %></title>
+    <style>
+      :root {
+        --theme-primary: <%= portalTheme.primary %>;
+        --theme-secondary: <%= portalTheme.secondary %>;
+        --theme-tertiary: <%= portalTheme.tertiary %>;
+        --theme-accent-pink: <%= portalTheme.accentPink %>;
+        --theme-bg-start: <%= portalTheme.bgStart %>;
+        --theme-bg-end: <%= portalTheme.bgEnd %>;
+        --theme-glow: <%= portalTheme.glow %>;
+      }
+    </style>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <% const isRobotInterfacePath = String(currentPath || '').startsWith('/client/robot/'); %>
+  <body class="<%= isRobotInterfacePath ? 'client-robot-page' : '' %>">
+    <% const isClientPath = String(currentPath || '').startsWith('/client'); %>
+    <% if (!isRobotInterfacePath) { %>
+    <header class="site-header">
+      <div class="brand">
+        <a href="/" class="brand-link"><%= appName %></a>
+        <span class="slug"><%= appSlug %></span>
+      </div>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">☰</button>
+      <nav id="site-nav" class="site-nav">
+        <% if (!currentUser && !isClientPath) { %>
+        <a href="/">Home</a>
+        <a href="/platform">Platform</a>
+        <a href="/client">Client App</a>
+        <a href="/signup">Mentor Sign Up</a>
+        <a href="/signin">Mentor Sign In</a>
+        <% } else if (!currentUser && isClientPath) { %>
+        <a href="/">Home</a>
+        <a href="/client">Client App</a>
+        <a href="/signin">Mentor Sign In</a>
+        <% } else if (currentUser.role === 'superhost') { %>
+        <a href="/platform">Platform</a>
+        <a href="/client">Client App</a>
+        <a href="/superhost/dashboard">Superhost Dashboard</a>
+        <form action="/logout" method="POST" class="inline-form">
+          <button type="submit" class="link-button">Logout</button>
+        </form>
+        <% } else { %>
+        <a href="/platform">Platform</a>
+        <a href="/client">Client App</a>
+        <a href="/mentor/dashboard">Mentor Dashboard</a>
+        <form action="/logout" method="POST" class="inline-form">
+          <button type="submit" class="link-button">Logout</button>
+        </form>
+        <% } %>
+      </nav>
+    </header>
+    <% } %>
+
+    <main class="container <%= isRobotInterfacePath ? 'container-client-robot' : '' %>">
+      <% if (flash) { %>
+      <div class="flash <%= flash.type %>"><%= flash.message %></div>
+      <% } %>

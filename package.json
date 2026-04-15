@@ -1,0 +1,24 @@
+{
+  "name": "futureeapro",
+  "version": "1.0.0",
+  "description": "Future EA Pro mentor robot hosting platform",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "echo \"No automated tests configured yet\"",
+    "preview:client-mobile": "node scripts/generate-client-mobile-previews.js",
+    "preview:web": "node scripts/generate-web-portal-previews.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "ejs": "^5.0.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  }
+}

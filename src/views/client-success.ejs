@@ -1,0 +1,35 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="auth-card">
+  <h1>Subscription Successful</h1>
+  <p>Your subscription has been created and your robot interface is unlocked.</p>
+
+  <div class="summary-list">
+    <p><strong>Mentor:</strong> <%= mentor ? mentor.name : 'Unknown mentor' %></p>
+    <p><strong>Mentor ID:</strong> <%= subscription.mentorPortalId %></p>
+    <p><strong>Client Email:</strong> <%= subscription.clientEmail %></p>
+    <p><strong>Plan:</strong> <%= plan ? plan.label : subscription.planCode %></p>
+    <p><strong>Amount Paid:</strong> R<%= subscription.amountZar %></p>
+    <p><strong>License Key:</strong> <code><%= subscription.licenseKey %></code></p>
+    <p><strong>Start Date:</strong> <%= new Date(subscription.startedAt).toLocaleString() %></p>
+    <p><strong>End Date:</strong> <%= new Date(subscription.endsAt).toLocaleString() %></p>
+  </div>
+
+  <% if (featuredRobot && featuredRobot.imageUrl) { %>
+  <div class="profile-preview client-face-card">
+    <img
+      src="<%= featuredRobot.imageUrl %>"
+      alt="<%= featuredRobot.name %> preview"
+      class="robot-preview-lg robot-preview-feature"
+    />
+    <p class="hint">Robot: <strong><%= featuredRobot.name %></strong></p>
+  </div>
+  <% } %>
+
+  <div class="cta-row">
+    <a href="/client/robot/<%= subscription.id %>" class="button secondary">Open Robot Interface</a>
+    <a href="/client" class="button">New Subscription</a>
+  </div>
+</section>
+
+<%- include('partials/bottom') %>

@@ -1,0 +1,44 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="auth-shell">
+  <article class="auth-card auth-compact">
+    <div class="auth-logo-wrap">
+      <img src="/assets/robot-preview-user.jpg" alt="Robot preview" class="auth-hero-robot" />
+    </div>
+    <h1>Mentor Sign Up</h1>
+    <p class="hint">Create your mentor account and submit your robot profile.</p>
+
+    <form action="/signup" method="POST" class="stack-form">
+      <label>
+        Full Name
+        <input type="text" name="name" required />
+      </label>
+
+      <label>
+        Display Name
+        <input type="text" name="displayName" placeholder="Shown on portal" />
+      </label>
+
+      <label>
+        Email
+        <input type="email" name="email" required />
+      </label>
+
+      <label>
+        Contact Number
+        <input type="text" name="contactNumber" placeholder="Optional" />
+      </label>
+
+      <label>
+        Password
+        <input type="password" name="password" minlength="8" required />
+      </label>
+
+      <button type="submit" class="button">Register</button>
+    </form>
+
+    <p class="hint">Already registered? <a href="/signin">Mentor Sign In</a></p>
+  </article>
+</section>
+
+<%- include('partials/bottom') %>

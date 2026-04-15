@@ -1,0 +1,82 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-head">
+  <h1>Mentor Full Details</h1>
+  <p>
+    <strong><%= details.user.name %></strong> (<%= details.user.email %>)
+    - Mentor ID: <strong><%= details.user.mentorPortalId || '-' %></strong>
+  </p>
+  <p>
+    Approved: <%= details.user.approved ? 'Yes' : 'No' %> |
+    Subscription: <%= details.user.subscriptionActive ? 'Active' : 'Inactive' %> |
+    License Limit: <%= details.user.licenseKeyLimit %>
+  </p>
+  <p><a href="/superhost/dashboard">Back to dashboard</a></p>
+</section>
+
+<section class="panel-grid single">
+  <article class="panel">
+    <h2>Mentor Profile (Portal Only)</h2>
+    <p><strong>Headline:</strong> <%= details.user.profileHeadline || '-' %></p>
+    <p><strong>Phone:</strong> <%= details.user.profilePhone || '-' %></p>
+    <p><strong>Bio:</strong> <%= details.user.profileBio || '-' %></p>
+    <% if (details.user.profileImageUrl) { %>
+    <img src="<%= details.user.profileImageUrl %>" alt="Mentor profile image" class="robot-thumb" />
+    <% } %>
+  </article>
+</section>
+
+<section class="panel-grid">
+  <article class="panel">
+    <h2>Robot Profiles</h2>
+    <% if (!details.robots.length) { %>
+    <p class="hint">No robots found.</p>
+    <% } else { %>
+    <ul class="list">
+      <% details.robots.forEach((robot) => { %>
+      <li>
+        <strong><%= robot.name %></strong> - <%= robot.category || 'General' %> - <%= robot.status %><br />
+        Stats: Uptime <%= robot.keyStats.uptimeHours %>h, Tasks <%= robot.keyStats.tasksCompleted %>,
+        Success <%= robot.keyStats.successRate %>%<br />
+        Mobile: <%= robot.mobileBuild && robot.mobileBuild.status === 'ready' ? 'Ready (Android + iOS)' : 'Not converted' %>
+      </li>
+      <% }) %>
+    </ul>
+    <% } %>
+  </article>
+
+  <article class="panel">
+    <h2>License Keys</h2>
+    <% if (!details.licenseKeys.length) { %>
+    <p class="hint">No license keys found.</p>
+    <% } else { %>
+    <ul class="list">
+      <% details.licenseKeys.forEach((item) => { %>
+      <li><code><%= item.key %></code> - <%= item.status %></li>
+      <% }) %>
+    </ul>
+    <% } %>
+  </article>
+</section>
+
+<section class="panel-grid single">
+  <article class="panel">
+    <h2>Client Subscriptions</h2>
+    <% if (!details.clientSubscriptions.length) { %>
+    <p class="hint">No subscriptions found.</p>
+    <% } else { %>
+    <ul class="list">
+      <% details.clientSubscriptions.forEach((item) => { %>
+      <li>
+        <strong><%= item.clientEmail %></strong> -
+        Plan: <%= item.planCode %> -
+        Amount: R<%= item.amountZar %> -
+        Key: <code><%= item.licenseKey %></code>
+      </li>
+      <% }) %>
+    </ul>
+    <% } %>
+  </article>
+</section>
+
+<%- include('partials/bottom') %>

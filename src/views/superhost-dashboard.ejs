@@ -1,0 +1,170 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-head">
+  <h1>Superhost Dashboard</h1>
+  <p>
+    You are signed in as superhost (<strong><%= currentUser.email %></strong>). Manage mentor access,
+    subscription bypass/reactivation, and license limits.
+  </p>
+</section>
+
+<section class="panel-grid single">
+  <article class="panel">
+    <h2>Portal Theme</h2>
+    <p class="hint">Default is a clean red neon mix. You can still switch presets or customize every color.</p>
+
+    <div class="cta-row">
+      <form action="/superhost/theme" method="POST" class="inline-form">
+        <input type="hidden" name="preset" value="dope_red" />
+        <button type="submit" class="button secondary">Dope Red (Default)</button>
+      </form>
+      <form action="/superhost/theme" method="POST" class="inline-form">
+        <input type="hidden" name="preset" value="neon_rose" />
+        <button type="submit" class="button secondary">Neon Rose</button>
+      </form>
+      <form action="/superhost/theme" method="POST" class="inline-form">
+        <input type="hidden" name="preset" value="acid_lime" />
+        <button type="submit" class="button secondary">Acid Lime</button>
+      </form>
+      <form action="/superhost/theme" method="POST" class="inline-form">
+        <input type="hidden" name="preset" value="ember_flux" />
+        <button type="submit" class="button secondary">Ember Flux</button>
+      </form>
+      <form action="/superhost/theme" method="POST" class="inline-form">
+        <input type="hidden" name="preset" value="cyber_sunset" />
+        <button type="submit" class="button secondary">Cyber Sunset</button>
+      </form>
+    </div>
+
+    <form action="/superhost/theme" method="POST" class="stack-form">
+      <div class="row-fields">
+        <label>
+          Primary
+          <input type="color" name="primary" value="<%= portalTheme.primary %>" />
+        </label>
+
+        <label>
+          Secondary
+          <input type="color" name="secondary" value="<%= portalTheme.secondary %>" />
+        </label>
+      </div>
+
+      <div class="row-fields">
+        <label>
+          Tertiary
+          <input type="color" name="tertiary" value="<%= portalTheme.tertiary %>" />
+        </label>
+
+        <label>
+          Accent Pink
+          <input type="color" name="accentPink" value="<%= portalTheme.accentPink %>" />
+        </label>
+      </div>
+
+      <div class="row-fields">
+        <label>
+          Background Start
+          <input type="color" name="bgStart" value="<%= portalTheme.bgStart %>" />
+        </label>
+
+        <label>
+          Background End
+          <input type="color" name="bgEnd" value="<%= portalTheme.bgEnd %>" />
+        </label>
+      </div>
+
+      <div class="row-fields">
+        <label>
+          Glow
+          <input type="color" name="glow" value="<%= portalTheme.glow %>" />
+        </label>
+      </div>
+
+      <div class="cta-row">
+        <button type="submit" class="button">Save Theme</button>
+      </div>
+    </form>
+  </article>
+</section>
+
+<section class="panel-grid single">
+  <article class="panel">
+    <h2>Mentor Control Portal</h2>
+
+    <% if (!mentors.length) { %>
+    <p class="hint">No mentors registered yet.</p>
+    <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mentor</th>
+            <th>Mentor ID</th>
+            <th>Approval</th>
+            <th>Subscription</th>
+            <th>Keys Used</th>
+            <th>Active Subscribers</th>
+            <th>Key Limit</th>
+            <th>Robots</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% mentors.forEach((mentor) => { %>
+          <tr>
+            <td>
+              <strong><%= mentor.name %></strong><br />
+              <span class="hint"><%= mentor.email %></span>
+            </td>
+            <td><strong><%= mentor.mentorPortalId || '-' %></strong></td>
+            <td><span class="pill <%= mentor.approved ? 'ok' : 'off' %>"><%= mentor.approved ? 'Approved' : 'Pending' %></span></td>
+            <td>
+              <span class="pill <%= mentor.subscriptionActive ? 'ok' : 'off' %>">
+                <%= mentor.subscriptionActive ? 'Active' : 'Inactive' %>
+              </span>
+            </td>
+            <td><%= mentor.activeKeysUsed %> / <%= mentor.totalKeys %></td>
+            <td><%= mentor.activeSubscribers %></td>
+            <td><%= mentor.licenseKeyLimit %></td>
+            <td><%= mentor.robotsCount %></td>
+            <td>
+              <div class="action-stack">
+                <form action="/superhost/mentors/<%= mentor.id %>/approval" method="POST" class="inline-form">
+                  <input type="hidden" name="action" value="<%= mentor.approved ? 'revoke' : 'approve' %>" />
+                  <button type="submit" class="button mini <%= mentor.approved ? 'secondary' : '' %>">
+                    <%= mentor.approved ? 'Revoke' : 'Approve' %>
+                  </button>
+                </form>
+
+                <form action="/superhost/mentors/<%= mentor.id %>/subscription" method="POST" class="inline-form">
+                  <input type="hidden" name="action" value="<%= mentor.subscriptionActive ? 'deactivate' : 'activate' %>" />
+                  <button type="submit" class="button mini secondary">
+                    <%= mentor.subscriptionActive ? 'Deactivate Sub' : 'Reactivate Sub' %>
+                  </button>
+                </form>
+
+                <form action="/superhost/mentors/<%= mentor.id %>/license-limit" method="POST" class="inline-form row">
+                  <input
+                    type="number"
+                    name="limit"
+                    min="0"
+                    value="<%= mentor.licenseKeyLimit %>"
+                    class="limit-input"
+                    required
+                  />
+                  <button type="submit" class="button mini">Set Limit</button>
+                </form>
+
+                <a class="text-link" href="/superhost/mentors/<%= mentor.id %>">View Full Details</a>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </article>
+</section>
+
+<%- include('partials/bottom') %>

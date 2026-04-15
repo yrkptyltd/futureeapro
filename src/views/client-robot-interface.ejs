@@ -1,0 +1,487 @@
+<%- include('partials/top', { title: title }) %>
+
+<%
+  const sectionLabels = {
+    home: 'Home',
+    quotes: 'Quotes',
+    trade: 'Trade',
+    metrader: 'Metrader',
+    details: 'Details',
+    settings: 'Settings',
+  };
+  const activeLabel = sectionLabels[activeSection] || 'Home';
+  const robotName = featuredRobot ? featuredRobot.name : 'Algo Nova EA v6';
+  const robotImage = (featuredRobot && featuredRobot.imageUrl) ? featuredRobot.imageUrl : '/assets/robot-preview-user.jpg';
+%>
+
+<section class="client-app-root" data-default-robot-bg="<%= robotImage %>">
+  <button
+    id="client-menu-toggle"
+    type="button"
+    class="client-menu-toggle"
+    aria-expanded="false"
+    aria-controls="client-drawer"
+    aria-label="Open app menu"
+  >
+    ≡
+  </button>
+
+  <aside id="client-drawer" class="client-drawer" aria-hidden="true">
+    <div class="client-drawer-head">
+      <h2>Future EA Pro</h2>
+      <button type="button" class="icon-pill" data-action="close-drawer">x</button>
+    </div>
+
+    <p class="hint">Mentor ID: <strong><%= subscription.mentorPortalId %></strong></p>
+    <p class="hint">License Key: <code><%= subscription.licenseKey %></code></p>
+
+    <nav class="client-drawer-nav">
+      <a href="/client/robot/<%= subscription.id %>?section=home" class="side-menu-item <%= activeSection === 'home' ? 'active' : '' %>">Home</a>
+      <a href="/client/robot/<%= subscription.id %>?section=quotes" class="side-menu-item <%= activeSection === 'quotes' ? 'active' : '' %>">Quotes</a>
+      <a href="/client/robot/<%= subscription.id %>?section=trade" class="side-menu-item <%= activeSection === 'trade' ? 'active' : '' %>">Trade</a>
+      <a href="/client/robot/<%= subscription.id %>?section=metrader" class="side-menu-item <%= activeSection === 'metrader' ? 'active' : '' %>">Metrader</a>
+      <a href="/client/robot/<%= subscription.id %>?section=details" class="side-menu-item <%= activeSection === 'details' ? 'active' : '' %>">Details</a>
+      <a href="/client/robot/<%= subscription.id %>?section=settings" class="side-menu-item <%= activeSection === 'settings' ? 'active' : '' %>">Settings</a>
+    </nav>
+
+    <p class="hint">MT4 / MT5 brokers supported, including Razor Markets.</p>
+  </aside>
+
+  <div class="client-screen-wrap">
+    <% if (activeSection === 'home') { %>
+    <section class="client-screen client-home-screen">
+      <article class="home-hero-card client-face-card">
+        <img src="<%= robotImage %>" alt="<%= robotName %>" class="home-hero-image robot-preview-feature" />
+        <p class="home-hero-title"><%= robotName %></p>
+      </article>
+
+      <article class="home-action-panel">
+        <button type="button" class="home-action-btn" data-go-section="quotes">
+          <span class="action-icon">↗</span>
+          <span class="action-label">Quotes</span>
+        </button>
+        <button type="button" class="home-action-btn action-trade-btn" data-go-section="trade">
+          <span class="action-icon">▶</span>
+          <span class="action-label">Trade</span>
+        </button>
+        <button type="button" class="home-action-btn" data-action="remove-robot">
+          <span class="action-icon">⌫</span>
+          <span class="action-label">Remove</span>
+        </button>
+      </article>
+
+      <p class="powered-by">Powered by <strong>Future EA Pro</strong></p>
+
+      <article class="home-list-card">
+        <img src="<%= robotImage %>" alt="<%= robotName %> icon" class="home-list-avatar" />
+        <div>
+          <p class="home-list-title"><%= robotName %></p>
+          <p class="home-list-sub">IDLE</p>
+        </div>
+      </article>
+
+      <article class="home-list-card minimal">
+        <div class="home-list-icon">📊</div>
+        <div>
+          <p class="home-list-title">Chart Scanner</p>
+          <p class="home-list-sub">AI-powered trade analysis</p>
+        </div>
+        <img src="<%= robotImage %>" alt="<%= robotName %> badge" class="home-card-badge-avatar" />
+      </article>
+
+      <article class="home-list-card minimal">
+        <div class="home-list-icon">＋</div>
+        <div>
+          <p class="home-list-title">Add a New EA</p>
+          <p class="home-list-sub">Have a valid license key</p>
+        </div>
+      </article>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'quotes') { %>
+    <section class="client-screen quotes-screen">
+      <header class="quotes-topbar">
+        <a href="/client/robot/<%= subscription.id %>?section=home" class="icon-nav-btn" aria-label="Back to home">←</a>
+        <div>
+          <p class="quotes-title">QUOTES <span class="quotes-inactive">inactive</span></p>
+          <p class="quotes-sub"><%= robotName %></p>
+          <p class="quotes-symbols hint"><%= quoteRows.length %> symbols available</p>
+        </div>
+        <button type="button" class="icon-nav-btn" data-action="quotes-refresh" aria-label="Refresh quotes">↻</button>
+      </header>
+
+      <div class="platform-tabs quotes-symbol-tabs" data-quotes-symbol-tabs>
+        <button type="button" class="tab-pill active" data-symbol-tab-choice="symbols">
+          Symbols (<%= quoteRows.length %>)
+        </button>
+        <button type="button" class="tab-pill" data-symbol-tab-choice="allowed">
+          Allowed Symbols (<%= allowedQuoteRows.length %>)
+        </button>
+      </div>
+
+      <section class="quotes-symbol-panel active" data-symbol-tab-panel="symbols">
+        <form action="/client/robot/<%= subscription.id %>/symbols/allowed" method="POST" class="stack-form">
+          <div class="quotes-list">
+            <% quoteRows.forEach((quote) => { %>
+            <label class="quote-select-card">
+              <span class="quote-select-input-wrap">
+                <input
+                  type="checkbox"
+                  name="symbols"
+                  value="<%= quote.symbol %>"
+                  <%= selectedSymbolsLookup[quote.symbol] ? 'checked' : '' %>
+                />
+              </span>
+              <article class="quote-card">
+                <p class="quote-symbol"><%= quote.symbol %></p>
+                <div class="quote-meta-row">
+                  <p><span class="hint">Lot Size</span><br /><strong><%= quote.lotSize %></strong></p>
+                  <p><span class="hint">Platform</span><br /><strong><%= quote.platform %></strong></p>
+                  <p><span class="hint">Direction</span><br /><strong class="quote-buy"><%= quote.direction %></strong></p>
+                </div>
+              </article>
+            </label>
+            <% }) %>
+          </div>
+          <button type="submit" class="button">Save Allowed Symbols</button>
+        </form>
+      </section>
+
+      <section class="quotes-symbol-panel" data-symbol-tab-panel="allowed" hidden>
+        <% if (!allowedQuoteRows.length) { %>
+        <p class="hint">No allowed symbols selected yet. Choose from Symbols first.</p>
+        <% } else { %>
+        <div class="quotes-list">
+          <% allowedQuoteRows.forEach((quote) => { %>
+          <article class="quote-card">
+            <p class="quote-symbol"><%= quote.symbol %></p>
+            <div class="quote-meta-row">
+              <p><span class="hint">Lot Size</span><br /><strong><%= quote.lotSize %></strong></p>
+              <p><span class="hint">Platform</span><br /><strong><%= quote.platform %></strong></p>
+              <p><span class="hint">Direction</span><br /><strong class="quote-buy"><%= quote.direction %></strong></p>
+            </div>
+          </article>
+          <% }) %>
+        </div>
+        <% } %>
+      </section>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'trade') { %>
+    <section class="client-screen trade-screen">
+      <article class="panel">
+        <h2>Trade</h2>
+        <p class="hint">Start or pause robot execution, then launch quick controls from the floating icon.</p>
+        <div class="cta-row">
+          <button class="button" data-action="start-robot">Start Robot</button>
+          <button class="button" data-action="pause-robot">Pause Robot</button>
+          <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button secondary">Open Quotes</a>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Execution Status</h2>
+        <div class="summary-list">
+          <p><strong>Robot:</strong> <%= robotName %></p>
+          <p><strong>Status:</strong> Active</p>
+          <p><strong>Signal Mode:</strong> Auto</p>
+          <p><strong>Risk Profile:</strong> Balanced</p>
+        </div>
+      </article>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'metrader') { %>
+    <section class="client-screen metrader-screen">
+      <article class="panel">
+        <div class="platform-tabs" data-platform-tabs>
+          <button type="button" class="tab-pill active" data-platform-choice="MT5">MT5 ACCOUNT</button>
+          <button type="button" class="tab-pill" data-platform-choice="MT4">MT4 ACCOUNT</button>
+        </div>
+
+        <p class="platform-status"><span class="status-dot"></span><span data-platform-status-label>MT5 CONNECTED</span></p>
+
+        <h2 class="mt-login-heading" data-platform-login-title>MT5 LOGIN DETAILS</h2>
+
+        <form action="/client/robot/<%= subscription.id %>/metrader/connect" method="POST" class="stack-form">
+          <input type="hidden" name="platform" value="MT5" data-platform-input />
+
+          <label>
+            Broker
+            <select name="brokerName" required>
+              <% brokerOptions.forEach((brokerName) => { %>
+              <option value="<%= brokerName %>"><%= brokerName %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label>
+            Login / Account Number
+            <input type="text" name="accountNumber" required />
+          </label>
+
+          <label>
+            Password
+            <input type="password" name="notes" placeholder="Optional in preview" />
+          </label>
+
+          <label>
+            Broker Server
+            <input type="text" name="serverName" placeholder="Search MT broker server..." required />
+          </label>
+
+          <label>
+            Custom Broker Name (if selected custom)
+            <input type="text" name="customBrokerName" placeholder="Enter broker name" />
+          </label>
+
+          <div class="cta-row">
+            <button type="submit" class="button">Link MT Account Details</button>
+          </div>
+        </form>
+
+        <article class="mt4-brokers-card" data-mt4-brokers-card hidden>
+          <div class="mt4-brokers-head">
+            <h3>Active MT4 Brokers</h3>
+            <button type="button" class="icon-pill" data-action="refresh-mt4">↻</button>
+          </div>
+          <ul class="broker-chip-list">
+            <li>
+              <span class="broker-name"><span class="broker-state-dot demo"></span>FXCM-Demo01</span>
+              <span class="pill">Demo</span>
+            </li>
+            <li>
+              <span class="broker-name"><span class="broker-state-dot live"></span>FXCM-USDReal</span>
+              <span class="pill ok">Live</span>
+            </li>
+            <li>
+              <span class="broker-name"><span class="broker-state-dot demo"></span>ICMarkets-Demo</span>
+              <span class="pill">Demo</span>
+            </li>
+            <li>
+              <span class="broker-name"><span class="broker-state-dot live"></span>RazorMarkets-Live</span>
+              <span class="pill ok">Live</span>
+            </li>
+            <li>
+              <span class="broker-name"><span class="broker-state-dot live"></span>Exness-Real03</span>
+              <span class="pill ok">Live</span>
+            </li>
+          </ul>
+        </article>
+      </article>
+
+      <article class="panel">
+        <h2>Connected Brokers</h2>
+        <% if (!brokerConnections.length) { %>
+        <p class="hint">No broker connections yet.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Broker</th>
+                <th>Account</th>
+                <th>Server</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% brokerConnections.forEach((connection) => { %>
+              <tr>
+                <td><%= connection.platform %></td>
+                <td><%= connection.brokerName %></td>
+                <td><%= connection.accountNumber %></td>
+                <td><%= connection.serverName %></td>
+                <td><span class="pill ok"><%= connection.status || 'connected' %></span></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </article>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'details') { %>
+    <section class="client-screen details-screen">
+      <article class="panel">
+        <h2>Subscription Details</h2>
+        <div class="summary-list">
+          <p><strong>Mentor ID:</strong> <%= subscription.mentorPortalId %></p>
+          <p><strong>Client Email:</strong> <%= subscription.clientEmail %></p>
+          <p><strong>Plan:</strong> <%= plan ? plan.label : subscription.planCode %></p>
+          <p><strong>Amount Paid:</strong> R<%= subscription.amountZar %></p>
+          <p><strong>License Key:</strong> <code><%= subscription.licenseKey %></code></p>
+          <p><strong>Start Date:</strong> <%= new Date(subscription.startedAt).toLocaleString() %></p>
+          <p><strong>End Date:</strong> <%= new Date(subscription.endsAt).toLocaleString() %></p>
+          <p><strong>Section:</strong> <%= activeLabel %></p>
+        </div>
+      </article>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'settings') { %>
+    <section class="client-screen settings-screen">
+      <article class="panel">
+        <h2>Settings</h2>
+
+        <h3>Theme</h3>
+        <div class="theme-chip-grid">
+          <button type="button" class="theme-chip active" data-client-theme-choice="red">Red</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="pink">Pink</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="green">Green</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="purple">Purple</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="orange">Orange</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="cyan">Cyan</button>
+          <button type="button" class="theme-chip" data-client-theme-choice="blue">Blue</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Glass Style</h3>
+        <p class="hint">Dark glass with accent aura</p>
+        <div class="option-chip-grid">
+          <button type="button" class="option-chip active" data-glass-style-choice="neon">Neon</button>
+          <button type="button" class="option-chip" data-glass-style-choice="minimal">Minimal</button>
+          <button type="button" class="option-chip" data-glass-style-choice="liquid">Liquid</button>
+          <button type="button" class="option-chip" data-glass-style-choice="commander">Commander</button>
+          <button type="button" class="option-chip" data-glass-style-choice="mech">Mech</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Font</h3>
+        <div class="option-chip-grid">
+          <button type="button" class="option-chip active" data-font-style-choice="system">System</button>
+          <button type="button" class="option-chip" data-font-style-choice="mono">Mono</button>
+          <button type="button" class="option-chip" data-font-style-choice="rounded">Rounded</button>
+          <button type="button" class="option-chip" data-font-style-choice="condensed">Condensed</button>
+          <button type="button" class="option-chip" data-font-style-choice="serif">Serif</button>
+          <button type="button" class="option-chip" data-font-style-choice="grotesk">Grotesk</button>
+        </div>
+      </article>
+
+      <%- include('partials/client-face-picker') %>
+
+      <article class="panel">
+        <h3>Text Case</h3>
+        <div class="option-chip-grid">
+          <button type="button" class="option-chip active" data-text-case-choice="normal">Normal</button>
+          <button type="button" class="option-chip" data-text-case-choice="upper">Upper</button>
+          <button type="button" class="option-chip" data-text-case-choice="lower">Lower</button>
+          <button type="button" class="option-chip" data-text-case-choice="capitalize">Capitalize</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Background</h3>
+        <p class="hint">EA robot image</p>
+        <div class="option-chip-grid">
+          <button type="button" class="option-chip active" data-bg-style-choice="robot">Robot</button>
+          <button type="button" class="option-chip" data-bg-style-choice="v1">V1</button>
+          <button type="button" class="option-chip" data-bg-style-choice="v2">V2</button>
+          <button type="button" class="option-chip" data-bg-style-choice="v3">V3</button>
+          <button type="button" class="option-chip" data-bg-style-choice="v4">V4</button>
+          <button type="button" class="option-chip" data-bg-style-choice="off">Off</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Bottom Shade Color</h3>
+        <p class="hint">Match the app shade to your robot colors.</p>
+        <div class="option-chip-grid shade-chip-grid">
+          <button type="button" class="option-chip active" data-bottom-shade-choice="red">Red</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="pink">Pink</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="orange">Orange</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="amber">Amber</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="purple">Purple</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="blue">Blue</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="teal">Teal</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="green">Green</button>
+          <button type="button" class="option-chip" data-bottom-shade-choice="custom">Custom</button>
+        </div>
+
+        <div class="shade-picker-wrap">
+          <p class="hint">Drag the dot to choose your custom shade.</p>
+          <div class="shade-picker-pad" data-shade-pad>
+            <span class="shade-picker-dot" data-shade-dot></span>
+          </div>
+          <label class="shade-hue-control">
+            Hue
+            <input type="range" min="0" max="360" value="0" data-shade-hue />
+          </label>
+          <div class="shade-picker-meta">
+            <span class="shade-color-value" data-custom-shade-value>#ff3f52</span>
+            <button type="button" class="button mini" data-action="apply-custom-shade">Use Custom Shade</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h3>Robot Picture Background</h3>
+        <p class="hint">Use any robot image as full-screen app background.</p>
+        <label>
+          Robot Image URL
+          <input
+            type="url"
+            data-robot-bg-input
+            placeholder="https://example.com/your-robot-image.jpg"
+          />
+        </label>
+        <div class="cta-row">
+          <button type="button" class="button mini" data-action="apply-robot-bg-url">Apply Image</button>
+          <button type="button" class="button mini secondary" data-action="reset-robot-bg">Use Default Robot</button>
+        </div>
+        <label class="upload-field">
+          Upload Robot Picture
+          <input type="file" accept="image/*" data-robot-bg-file />
+        </label>
+      </article>
+
+      <article class="panel">
+        <h3>About Future EA Pro</h3>
+        <p class="hint">Version, license and support information.</p>
+      </article>
+    </section>
+    <% } %>
+  </div>
+
+</section>
+
+<script src="/client-face.js" defer></script>
+<script src="/client-robot-interface.js" defer></script>
+
+<button
+  id="robot-floating-launcher"
+  type="button"
+  class="robot-float-button is-hidden"
+  aria-label="Open robot launcher"
+>
+  <img src="<%= robotImage %>" alt="Robot launcher" />
+</button>
+
+<div id="robot-floating-panel" class="robot-float-panel is-hidden" aria-live="polite">
+  <div class="robot-float-header">
+    <img src="<%= robotImage %>" alt="Robot mini icon" />
+    <div>
+      <p class="robot-float-name"><%= robotName %></p>
+      <p class="robot-float-status">
+        Status:
+        <span id="robot-status-pill" class="status-pill active">Active</span>
+      </p>
+    </div>
+    <button type="button" id="robot-floating-close" class="robot-float-close" aria-label="Close robot menu">x</button>
+  </div>
+
+  <div class="robot-float-actions">
+    <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button mini">Quotes</a>
+    <a href="/client/robot/<%= subscription.id %>?section=trade" class="button mini">Trade</a>
+    <a href="/client/robot/<%= subscription.id %>?section=metrader" class="button mini">Brokers</a>
+  </div>
+</div>
+
+<%- include('partials/bottom') %>

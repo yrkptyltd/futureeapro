@@ -1,0 +1,47 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-head">
+  <h1>Choose Subscription</h1>
+  <p>
+    Mentor: <strong><%= flow.mentorName %></strong>
+    (ID: <strong><%= flow.mentorPortalId %></strong>)
+  </p>
+  <p>Client Email: <strong><%= flow.clientEmail %></strong></p>
+</section>
+
+<section class="panel-grid single">
+  <article class="panel client-face-card">
+    <h2>Robot Preview</h2>
+    <% if (featuredRobot && featuredRobot.imageUrl) { %>
+    <img
+      src="<%= featuredRobot.imageUrl %>"
+      alt="<%= featuredRobot.name %> preview"
+      class="robot-preview-lg robot-preview-feature"
+    />
+    <p><strong><%= featuredRobot.name %></strong></p>
+    <% } else if (featuredRobot) { %>
+    <p><strong><%= featuredRobot.name %></strong></p>
+    <p class="hint">Robot image not uploaded yet.</p>
+    <% } else { %>
+    <p class="hint">No robot profile is available yet for this mentor.</p>
+    <% } %>
+  </article>
+</section>
+
+<section class="plan-grid">
+  <% plans.forEach((plan) => { %>
+  <article class="panel plan-card">
+    <h2><%= plan.label %></h2>
+    <p class="plan-price">R<%= plan.amountZar %></p>
+    <p class="hint"><%= plan.durationMonths %> month<%= plan.durationMonths > 1 ? 's' : '' %> access</p>
+    <p class="hint">Next step: enter your mentor-issued unique license key.</p>
+
+    <form action="/client/subscribe" method="POST">
+      <input type="hidden" name="planCode" value="<%= plan.code %>" />
+      <button type="submit" class="button">Continue to Key Unlock</button>
+    </form>
+  </article>
+  <% }) %>
+</section>
+
+<%- include('partials/bottom') %>

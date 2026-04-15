@@ -1,0 +1,29 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="auth-shell">
+  <article class="auth-card auth-compact">
+    <div class="auth-logo-wrap">
+      <img src="/assets/future-ea-pro-logo.svg" alt="Future EA Pro logo" class="auth-logo" />
+    </div>
+    <h1>Mentor Sign In</h1>
+    <p class="hint">Admin dashboard access for approved mentors.</p>
+
+    <form action="/signin" method="POST" class="stack-form">
+      <label>
+        Email address
+        <input type="email" name="email" required />
+      </label>
+
+      <label>
+        Password
+        <input type="password" name="password" required />
+      </label>
+
+      <button type="submit" class="button">Sign In</button>
+    </form>
+
+    <p class="hint">No account yet? <a href="/signup">Create Account</a></p>
+  </article>
+</section>
+
+<%- include('partials/bottom') %>

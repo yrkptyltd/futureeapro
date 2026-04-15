@@ -1,0 +1,378 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-head">
+  <h1>Mentor Dashboard</h1>
+  <p>
+    Welcome, <strong><%= mentor.name %></strong>.
+    Your Mentor ID is <strong><%= mentor.mentorPortalId %></strong>.
+  </p>
+</section>
+
+<section class="mentor-layout">
+  <aside class="mentor-sidebar">
+    <h2>Menu</h2>
+    <a href="#overview">Overview</a>
+    <a href="#my-profile">My Profile</a>
+    <a href="#track-business">Track My Business</a>
+    <a href="#client-keys">Client Keys</a>
+    <a href="#create-robot">Create Robot</a>
+    <a href="#my-robots">My Robots</a>
+  </aside>
+
+  <div class="mentor-main">
+    <section class="totals-grid" id="overview">
+      <article class="panel total-card">
+        <h3>Total Keys</h3>
+        <p class="total-value"><%= dashboardTotals.totalKeys %></p>
+      </article>
+
+      <article class="panel total-card">
+        <h3>Total Generated</h3>
+        <p class="total-value"><%= dashboardTotals.totalGenerated %></p>
+      </article>
+
+      <article class="panel total-card">
+        <h3>Active Subscribers</h3>
+        <p class="total-value"><%= dashboardTotals.activeSubscribers %></p>
+      </article>
+    </section>
+
+    <section class="panel-grid single" id="my-profile">
+      <article class="panel">
+        <h2>My Profile (Portal Only)</h2>
+        <p class="hint">
+          These details are only shown inside the mentor portal and superhost portal, not on the client app.
+        </p>
+
+        <form action="/mentor/profile" method="POST" class="stack-form">
+          <div class="row-fields">
+            <label>
+              Display Name
+              <input type="text" name="name" value="<%= mentor.name %>" required />
+            </label>
+
+            <label>
+              Profile Headline
+              <input type="text" name="profileHeadline" value="<%= mentor.profileHeadline || '' %>" placeholder="Lead Robotics Mentor" />
+            </label>
+          </div>
+
+          <label>
+            Bio
+            <textarea name="profileBio" rows="3" placeholder="Short mentor background"><%= mentor.profileBio || '' %></textarea>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Phone
+              <input type="text" name="profilePhone" value="<%= mentor.profilePhone || '' %>" />
+            </label>
+
+            <label>
+              Profile Image URL
+              <input type="url" name="profileImageUrl" value="<%= mentor.profileImageUrl || '' %>" placeholder="https://..." />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Save My Profile</button>
+        </form>
+
+        <% if (mentor.profileImageUrl) { %>
+        <div class="profile-preview">
+          <img src="<%= mentor.profileImageUrl %>" alt="Mentor profile image" class="robot-thumb" />
+          <p class="hint">Portal preview only.</p>
+        </div>
+        <% } %>
+      </article>
+    </section>
+
+    <section class="panel-grid single" id="track-business">
+      <article class="panel">
+        <h2>Track My Business</h2>
+        <p class="hint">
+          Set your robot price and monthly key target, then track sales and income in real time.
+        </p>
+
+        <form action="/mentor/business-settings" method="POST" class="stack-form">
+          <div class="row-fields">
+            <label>
+              Robot Price (per key)
+              <input
+                type="number"
+                name="robotPricePerKey"
+                min="0"
+                step="0.01"
+                value="<%= businessMetrics.robotPricePerKey %>"
+                required
+              />
+            </label>
+
+            <label>
+              Monthly Target (keys)
+              <input
+                type="number"
+                name="monthlyKeyTarget"
+                min="0"
+                step="1"
+                value="<%= businessMetrics.monthlyKeyTarget %>"
+                required
+              />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Save Business Targets</button>
+        </form>
+
+        <div class="business-grid">
+          <article class="business-card">
+            <h3>Keys Sold (<%= businessMetrics.monthLabel %>)</h3>
+            <p class="business-value"><%= businessMetrics.keysSoldThisMonth %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>Monthly Revenue</h3>
+            <p class="business-value">R<%= businessMetrics.monthlyRevenue.toFixed(2) %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>All-Time Revenue (Estimated)</h3>
+            <p class="business-value">R<%= businessMetrics.estimatedTotalRevenue.toFixed(2) %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>Projected Revenue (Your Price)</h3>
+            <p class="business-value">R<%= businessMetrics.projectedRevenueByMentorPrice.toFixed(2) %></p>
+          </article>
+
+          <article class="business-card">
+            <h3>Target Remaining</h3>
+            <p class="business-value"><%= businessMetrics.targetRemaining %></p>
+          </article>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-track">
+            <div class="progress-fill" style="width: <%= businessMetrics.targetProgressPercent %>%"></div>
+          </div>
+          <p class="hint">
+            Target progress: <strong><%= businessMetrics.targetProgressPercent %>%</strong>
+            <% if (businessMetrics.targetReached) { %>
+            (Target reached)
+            <% } %>
+          </p>
+        </div>
+      </article>
+    </section>
+
+    <section class="stats-grid">
+      <article class="panel">
+        <h2>Account Status</h2>
+        <p><strong>Mentor ID:</strong> <%= mentor.mentorPortalId %></p>
+        <p><strong>Email:</strong> <%= mentor.email %></p>
+        <p><strong>Approved:</strong> <%= mentor.approved ? 'Yes' : 'No' %></p>
+        <p><strong>Subscription Active:</strong> <%= mentor.subscriptionActive ? 'Yes' : 'No' %></p>
+        <p><strong>License Keys Used:</strong> <%= activeKeysUsed %> / <%= mentor.licenseKeyLimit %></p>
+      </article>
+
+      <article class="panel" id="client-keys">
+        <h2>Client Keys</h2>
+        <p class="hint">
+          Generate unique keys for clients. After clients subscribe, they must enter this key to unlock robot access.
+        </p>
+        <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
+          <label>
+            Reserve for Client Email (optional)
+            <input type="email" name="clientEmail" placeholder="client@example.com" />
+          </label>
+          <button type="submit" class="button">Generate Client Key</button>
+        </form>
+
+        <% if (!licenseKeys.length) { %>
+        <p class="hint">No client keys generated yet.</p>
+        <% } else { %>
+        <ul class="list">
+          <% licenseKeys.forEach((item) => { %>
+          <li>
+            <code><%= item.key %></code>
+            <% if (item.redeemedAt || item.status === 'redeemed') { %>
+            <span class="pill ok">redeemed</span>
+            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
+            <% } else if (item.reservedClientEmail) { %>
+            <span class="pill">reserved</span>
+            <span class="hint">for <%= item.reservedClientEmail %></span>
+            <% } else { %>
+            <span class="pill">available</span>
+            <% } %>
+          </li>
+          <% }) %>
+        </ul>
+        <% } %>
+      </article>
+    </section>
+
+    <section class="panel-grid single" id="create-robot">
+      <article class="panel">
+        <h2>Create Robot Profile</h2>
+
+        <% if (!mentor.subscriptionActive) { %>
+        <p class="warning">
+          Your subscription is currently inactive. Ask superhost to reactivate/bypass subscription.
+        </p>
+        <% } %>
+
+        <form action="/mentor/robots" method="POST" class="stack-form">
+          <label>
+            Robot Name
+            <input type="text" name="name" required />
+          </label>
+
+          <label>
+            Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+
+          <label>
+            Category
+            <input type="text" name="category" placeholder="Trading bot, assistant, support" />
+          </label>
+
+          <label>
+            Robot Picture URL (Shown on client app)
+            <input type="url" name="imageUrl" placeholder="https://..." />
+          </label>
+
+          <label>
+            Symbols (comma or new line separated)
+            <textarea
+              name="allowedSymbols"
+              rows="2"
+              placeholder="XAUUSD, GBPUSD, .US30., BTCUSD"
+            ><%= defaultSymbolsText %></textarea>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Version
+              <input type="text" name="version" placeholder="v1.0.0" />
+            </label>
+
+            <label>
+              Status
+              <select name="status">
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+              </select>
+            </label>
+          </div>
+
+          <h3>Key Stats</h3>
+          <div class="row-fields">
+            <label>
+              Uptime (hours)
+              <input type="number" step="1" name="uptimeHours" value="0" />
+            </label>
+
+            <label>
+              Tasks Completed
+              <input type="number" step="1" name="tasksCompleted" value="0" />
+            </label>
+          </div>
+
+          <div class="row-fields">
+            <label>
+              Success Rate (%)
+              <input type="number" step="0.01" name="successRate" value="0" />
+            </label>
+
+            <label>
+              Last Sync
+              <input type="text" name="lastSync" placeholder="2026-04-14T10:00:00Z" />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Create Robot</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="panel-grid single" id="my-robots">
+      <article class="panel">
+        <h2>Your Robot Profiles</h2>
+
+        <% if (!robots.length) { %>
+        <p class="hint">No robots created yet.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Picture</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Version</th>
+                <th>Key Stats</th>
+                <th>Symbols</th>
+                <th>Mobile Build</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% robots.forEach((robot) => { %>
+              <tr>
+                <td>
+                  <% if (robot.imageUrl) { %>
+                  <img src="<%= robot.imageUrl %>" alt="<%= robot.name %> image" class="robot-thumb" />
+                  <% } else { %>
+                  <span class="hint">No image</span>
+                  <% } %>
+                </td>
+                <td><%= robot.name %></td>
+                <td><%= robot.category || '-' %></td>
+                <td><span class="pill"><%= robot.status %></span></td>
+                <td><%= robot.version %></td>
+                <td>
+                  Uptime: <%= robot.keyStats.uptimeHours %>h,
+                  Tasks: <%= robot.keyStats.tasksCompleted %>,
+                  Success: <%= robot.keyStats.successRate %>%
+                </td>
+                <td>
+                  <form action="/mentor/robots/<%= robot.id %>/symbols" method="POST" class="table-inline-form">
+                    <input
+                      type="text"
+                      name="allowedSymbols"
+                      value="<%= (robot.allowedSymbols || []).join(', ') %>"
+                      placeholder="XAUUSD, GBPUSD, .US30."
+                      class="table-inline-input"
+                    />
+                    <button type="submit" class="button mini">Save</button>
+                  </form>
+                  <p class="hint"><%= (robot.allowedSymbols || []).length %> symbols</p>
+                </td>
+                <td>
+                  <% if (robot.mobileBuild && robot.mobileBuild.status === 'ready') { %>
+                  <span class="pill ok">Ready (Android + iOS)</span>
+                  <% } else { %>
+                  <span class="pill off">Not converted</span>
+                  <% } %>
+                </td>
+                <td>
+                  <form action="/mentor/robots/<%= robot.id %>/convert-mobile" method="POST">
+                    <button type="submit" class="button mini">
+                      <%= robot.mobileBuild && robot.mobileBuild.status === 'ready' ? 'Rebuild Mobile' : 'Convert to Mobile' %>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </article>
+    </section>
+  </div>
+</section>
+
+<%- include('partials/bottom') %>

@@ -1,0 +1,24 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="auth-card">
+  <h1>Client App</h1>
+  <p>
+    Enter your mentor ID and your email to continue to subscription setup.
+  </p>
+
+  <form action="/client/start" method="POST" class="stack-form">
+    <label>
+      Mentor ID
+      <input type="number" name="mentorPortalId" min="100" step="1" placeholder="100" required />
+    </label>
+
+    <label>
+      Client Email
+      <input type="email" name="clientEmail" required />
+    </label>
+
+    <button type="submit" class="button">Continue</button>
+  </form>
+</section>
+
+<%- include('partials/bottom') %>

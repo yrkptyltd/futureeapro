@@ -1,0 +1,59 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="40" x2="1040" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#160A15" />
+      <stop offset="0.5" stop-color="#2A0F1E" />
+      <stop offset="1" stop-color="#140A21" />
+    </linearGradient>
+    <linearGradient id="line" x1="300" y1="200" x2="900" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF5F6D" />
+      <stop offset="0.6" stop-color="#FFB347" />
+      <stop offset="1" stop-color="#9CFF57" />
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 380) rotate(90) scale(180 280)">
+      <stop stop-color="#FF7A7A" />
+      <stop offset="1" stop-color="#5F1C2D" stop-opacity="0" />
+    </radialGradient>
+    <filter id="glow" x="190" y="90" width="820" height="580" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="26" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="760" fill="url(#bg)" />
+
+  <g opacity="0.26">
+    <path d="M0 84H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 164H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 244H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 324H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 404H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 484H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 564H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M0 644H1200" stroke="#FF4F7B" stroke-width="2" />
+    <path d="M84 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M244 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M404 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M564 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M724 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M884 0V760" stroke="#FF7A7A" stroke-width="2" />
+    <path d="M1044 0V760" stroke="#FF7A7A" stroke-width="2" />
+  </g>
+
+  <ellipse cx="600" cy="380" rx="320" ry="220" fill="url(#core)" />
+
+  <g filter="url(#glow)">
+    <path d="M380 260L510 170H690L820 260V500L690 590H510L380 500V260Z" stroke="url(#line)" stroke-width="12" />
+    <path d="M465 335H545" stroke="#9CFF57" stroke-width="14" stroke-linecap="round" />
+    <path d="M655 335H735" stroke="#9CFF57" stroke-width="14" stroke-linecap="round" />
+    <path d="M460 450C502 495 548 520 600 520C652 520 698 495 740 450" stroke="#FFB347" stroke-width="12" stroke-linecap="round" />
+    <rect x="546" y="366" width="108" height="86" rx="24" stroke="#FF5F6D" stroke-width="10" />
+  </g>
+
+  <text x="600" y="706" text-anchor="middle" fill="#FFD9D9" font-size="52" font-family="Orbitron, Arial, sans-serif" letter-spacing="4">
+    ASTRA QUANTUM BOT
+  </text>
+</svg>
