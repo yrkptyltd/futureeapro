@@ -105,6 +105,6 @@ Outputs are saved in `previews/mobile/`.
   - `CLIENT_BYPASS_EMAILS=email1@example.com,email2@example.com`
 
 ## Mentor behavior
-- Mentors register and wait for superhost approval.
-- After approval, mentors can sign in.
+- Mentors are auto-approved on registration and can sign in immediately.
+- New mentors start with a default license key limit of 1000.
 - Creating robots and generating license keys requires active subscription access.

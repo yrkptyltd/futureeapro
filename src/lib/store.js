@@ -85,7 +85,16 @@ function getMentorByPortalId(mentorPortalId) {
 
 function createUser(userInput) {
   const data = readData();
+  const existing = data.users.find(
+    (user) => String(user.email || '').trim().toLowerCase() === String(userInput.email || '').trim().toLowerCase()
+  );
+  if (existing) {
+    return null;
+  }
+
   const isMentor = userInput.role === 'mentor';
+  const autoApproved = userInput.role === 'superhost' || userInput.role === 'mentor';
+  const defaultLicenseLimit = userInput.role === 'superhost' ? 9999 : isMentor ? 1000 : 3;
   const createdUser = {
     id: createId('usr'),
     name: userInput.name,
@@ -94,9 +103,9 @@ function createUser(userInput) {
     passwordSalt: userInput.passwordSalt,
     role: userInput.role,
     mentorPortalId: isMentor ? getNextMentorPortalIdFromData(data) : null,
-    approved: userInput.role === 'superhost',
-    subscriptionActive: userInput.role === 'superhost',
-    licenseKeyLimit: userInput.role === 'superhost' ? 9999 : 3,
+    approved: autoApproved,
+    subscriptionActive: autoApproved,
+    licenseKeyLimit: defaultLicenseLimit,
     robotPricePerKey: 0,
     monthlyKeyTarget: 0,
     profileHeadline: '',
@@ -178,7 +187,9 @@ function updateRobot(robotId, updates) {
 
 function createLicenseKey(input) {
   const data = readData();
-  const mentor = data.users.find((user) => user.id === input.mentorId && user.role === 'mentor');
+  const mentor = data.users.find(
+    (user) => user.id === input.mentorId && (user.role === 'mentor' || user.role === 'superhost')
+  );
   if (!mentor) {
     return null;
   }

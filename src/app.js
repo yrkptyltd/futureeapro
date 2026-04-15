@@ -225,14 +225,14 @@ app.post('/signup', (req, res) => {
   }
 
   if (getUserByEmail(email)) {
-    setFlash(req, 'error', 'That email is already registered.');
+    setFlash(req, 'error', 'That email is already registered. Please sign in with that email.');
     return res.redirect('/signup');
   }
 
   const role = email === SUPERHOST_EMAIL ? 'superhost' : 'mentor';
   const passwordData = createPasswordHash(password);
 
-  createUser({
+  const createdUser = createUser({
     name,
     email,
     passwordHash: passwordData.hash,
@@ -240,14 +240,15 @@ app.post('/signup', (req, res) => {
     role,
   });
 
+  if (!createdUser) {
+    setFlash(req, 'error', 'That email is already registered. Please sign in with that email.');
+    return res.redirect('/signup');
+  }
+
   if (role === 'superhost') {
     setFlash(req, 'success', 'Superhost account created. You can sign in now.');
   } else {
-    setFlash(
-      req,
-      'success',
-      'Account registration pending. Please check again after 5-15 minutes.'
-    );
+    setFlash(req, 'success', 'Account created successfully. You can sign in now.');
   }
 
   return res.redirect('/signin');
@@ -278,7 +279,7 @@ app.post('/signin', (req, res) => {
   }
 
   if (user.role === 'mentor' && !user.approved) {
-    setFlash(req, 'error', 'Account registration pending. Please check again after 5-15 minutes.');
+    setFlash(req, 'error', 'Your account is currently not approved. Contact support.');
     return res.redirect('/signin');
   }
 
@@ -312,9 +313,7 @@ app.get('/client', (_req, res) => {
 });
 
 app.get('/download/android', (_req, res) => {
-  return res.render('download-android', {
-    title: 'Download Android App',
-  });
+  return res.redirect('/client');
 });
 
 app.post('/client/start', (req, res) => {
@@ -711,60 +710,20 @@ app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
 });
 
 app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), (req, res) => {
-  const mentor = getUserById(req.currentUser.id);
-  const robots = listRobotsByMentor(req.currentUser.id).map((robot) => ({
-    ...robot,
-    allowedSymbols: getMentorAvailableSymbols(robot),
-  }));
-  const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
-  const clientSubscriptions = listClientSubscriptionsByMentor(req.currentUser.id);
-  const now = new Date();
-  const activeKeysUsed = licenseKeys.filter((item) => isLicenseKeyRedeemed(item)).length;
-  const activeSubscribers = clientSubscriptions.filter((item) =>
-    isSubscriptionActiveNow(item, now)
-  ).length;
-  const keysSoldThisMonth = clientSubscriptions.filter((item) =>
-    isInSameMonth(item.startedAt, now)
-  ).length;
-  const robotPricePerKey = toNonNegativeNumber(mentor.robotPricePerKey);
-  const monthlyKeyTarget = toNonNegativeInteger(mentor.monthlyKeyTarget, 10);
-  const monthlyRevenue = toCurrencyNumber(
-    sumAmount(clientSubscriptions.filter((item) => isInSameMonth(item.startedAt, now)).map((item) => item.amountZar))
-  );
-  const estimatedTotalRevenue = toCurrencyNumber(
-    sumAmount(clientSubscriptions.map((item) => item.amountZar))
-  );
-  const projectedRevenueByMentorPrice = toCurrencyNumber(keysSoldThisMonth * robotPricePerKey);
-  const targetRemaining = Math.max(monthlyKeyTarget - keysSoldThisMonth, 0);
-  const targetProgressPercent =
-    monthlyKeyTarget > 0 ? Math.min(100, Math.round((keysSoldThisMonth / monthlyKeyTarget) * 100)) : 0;
-
-  const dashboardTotals = {
-    totalKeys: mentor.licenseKeyLimit,
-    totalGenerated: licenseKeys.length,
-    activeSubscribers,
-  };
-  const businessMetrics = {
-    robotPricePerKey,
-    monthlyKeyTarget,
-    keysSoldThisMonth,
-    monthlyRevenue,
-    estimatedTotalRevenue,
-    projectedRevenueByMentorPrice,
-    targetRemaining,
-    targetProgressPercent,
-    targetReached: monthlyKeyTarget > 0 && keysSoldThisMonth >= monthlyKeyTarget,
-    monthLabel: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-  };
+  const dashboard = buildOperatorDashboard(req.currentUser.id, new Date());
+  if (!dashboard) {
+    setFlash(req, 'error', 'Account not found.');
+    return res.redirect('/signin');
+  }
 
   res.render('mentor-dashboard', {
     title: 'Mentor Dashboard',
-    mentor,
-    robots,
-    licenseKeys,
-    activeKeysUsed,
-    dashboardTotals,
-    businessMetrics,
+    mentor: dashboard.account,
+    robots: dashboard.robots,
+    licenseKeys: dashboard.licenseKeys,
+    activeKeysUsed: dashboard.activeKeysUsed,
+    dashboardTotals: dashboard.dashboardTotals,
+    businessMetrics: dashboard.businessMetrics,
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
   });
 });
@@ -940,6 +899,7 @@ app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('men
 
 app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, res) => {
   const now = new Date();
+  const superhostLab = buildOperatorDashboard(_req.currentUser.id, now);
   const mentors = listMentors().map((mentor) => {
     const robots = listRobotsByMentor(mentor.id);
     const keys = listLicenseKeysByMentor(mentor.id);
@@ -958,10 +918,187 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, re
     };
   });
 
+  const platformTotals = {
+    totalMentors: mentors.length,
+    totalKeys: mentors.reduce((sum, mentor) => sum + Number(mentor.licenseKeyLimit || 0), 0),
+    totalGenerated: mentors.reduce((sum, mentor) => sum + Number(mentor.totalKeys || 0), 0),
+    activeSubscribers: mentors.reduce((sum, mentor) => sum + Number(mentor.activeSubscribers || 0), 0),
+  };
+
   res.render('superhost-dashboard', {
     title: 'Superhost Dashboard',
     mentors,
+    superhostLab,
+    platformTotals,
+    defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
   });
+});
+
+app.post('/superhost/business-settings', requireAuth, requireRole('superhost'), (req, res) => {
+  const body = req.body || {};
+  const robotPricePerKey = Number(body.robotPricePerKey);
+  const monthlyKeyTarget = Number(body.monthlyKeyTarget);
+
+  if (!Number.isFinite(robotPricePerKey) || robotPricePerKey < 0) {
+    setFlash(req, 'error', 'Robot price must be a non-negative number.');
+    return res.redirect('/superhost/dashboard#track-business');
+  }
+
+  if (!Number.isInteger(monthlyKeyTarget) || monthlyKeyTarget < 0) {
+    setFlash(req, 'error', 'Monthly key target must be a non-negative whole number.');
+    return res.redirect('/superhost/dashboard#track-business');
+  }
+
+  updateUser(req.currentUser.id, {
+    robotPricePerKey: toCurrencyNumber(robotPricePerKey),
+    monthlyKeyTarget,
+  });
+
+  setFlash(req, 'success', 'Superhost lab business settings updated.');
+  return res.redirect('/superhost/dashboard#track-business');
+});
+
+app.post('/superhost/profile', requireAuth, requireRole('superhost'), (req, res) => {
+  const body = req.body || {};
+  updateUser(req.currentUser.id, {
+    name: String(body.name || '').trim() || req.currentUser.name,
+    profileHeadline: String(body.profileHeadline || '').trim(),
+    profileBio: String(body.profileBio || '').trim(),
+    profilePhone: String(body.profilePhone || '').trim(),
+    profileImageUrl: String(body.profileImageUrl || '').trim(),
+  });
+
+  setFlash(req, 'success', 'Superhost lab profile updated.');
+  return res.redirect('/superhost/dashboard#my-profile');
+});
+
+app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) => {
+  const body = req.body || {};
+  const superhost = getUserById(req.currentUser.id);
+  if (!superhost.subscriptionActive) {
+    setFlash(req, 'error', 'Superhost lab subscription is inactive.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  const name = String(body.name || '').trim();
+  if (!name) {
+    setFlash(req, 'error', 'Robot name is required.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  const parseNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  createRobot({
+    mentorId: req.currentUser.id,
+    name,
+    description: String(body.description || '').trim(),
+    category: String(body.category || '').trim(),
+    version: String(body.version || '').trim() || 'v1.0.0',
+    status: String(body.status || '').trim() || 'draft',
+    imageUrl: String(body.imageUrl || '').trim(),
+    allowedSymbols: parseSymbolsInput(body.allowedSymbols),
+    keyStats: {
+      uptimeHours: parseNumber(body.uptimeHours),
+      tasksCompleted: parseNumber(body.tasksCompleted),
+      successRate: parseNumber(body.successRate),
+      lastSync: String(body.lastSync || '').trim() || new Date().toISOString(),
+    },
+  });
+
+  setFlash(req, 'success', 'Superhost test robot profile created.');
+  return res.redirect('/superhost/dashboard#create-robot');
+});
+
+app.post('/superhost/robots/:robotId/symbols', requireAuth, requireRole('superhost'), (req, res) => {
+  const robot = getRobotById(req.params.robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Robot not found.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  const symbols = parseSymbolsInput(req.body && req.body.allowedSymbols);
+  if (!symbols.length) {
+    setFlash(req, 'error', 'Please provide at least one valid symbol.');
+    return res.redirect('/superhost/dashboard#my-robots');
+  }
+
+  updateRobot(robot.id, {
+    allowedSymbols: symbols,
+  });
+
+  setFlash(req, 'success', `Allowed symbols updated for ${robot.name}.`);
+  return res.redirect('/superhost/dashboard#my-robots');
+});
+
+app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost'), (req, res) => {
+  const superhost = getUserById(req.currentUser.id);
+  if (!superhost.subscriptionActive) {
+    setFlash(req, 'error', 'Superhost lab subscription is inactive.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  const body = req.body || {};
+  const reservedClientEmail = normalizeEmail(body.clientEmail);
+  const totalGenerated = listLicenseKeysByMentor(req.currentUser.id).length;
+  if (reservedClientEmail && !reservedClientEmail.includes('@')) {
+    setFlash(req, 'error', 'Reserved client email must be valid.');
+    return res.redirect('/superhost/dashboard#client-keys');
+  }
+
+  if (totalGenerated >= superhost.licenseKeyLimit) {
+    setFlash(req, 'error', 'You reached your current superhost test key limit.');
+    return res.redirect('/superhost/dashboard#client-keys');
+  }
+
+  const createdKey = createLicenseKey({
+    mentorId: req.currentUser.id,
+    status: 'available',
+    reservedClientEmail: reservedClientEmail || null,
+  });
+
+  if (!createdKey) {
+    setFlash(req, 'error', 'Could not generate a license key right now.');
+    return res.redirect('/superhost/dashboard#client-keys');
+  }
+
+  if (reservedClientEmail) {
+    setFlash(
+      req,
+      'success',
+      `New superhost test key generated: ${createdKey.key} (reserved for ${reservedClientEmail}).`
+    );
+  } else {
+    setFlash(req, 'success', `New superhost test key generated: ${createdKey.key}`);
+  }
+  return res.redirect('/superhost/dashboard#client-keys');
+});
+
+app.post('/superhost/robots/:robotId/convert-mobile', requireAuth, requireRole('superhost'), (req, res) => {
+  const superhost = getUserById(req.currentUser.id);
+  if (!superhost.subscriptionActive) {
+    setFlash(req, 'error', 'Superhost lab subscription is inactive.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  const robot = getRobotById(req.params.robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Robot not found.');
+    return res.redirect('/superhost/dashboard');
+  }
+
+  updateRobot(robot.id, {
+    mobileBuild: {
+      status: 'ready',
+      platforms: ['android', 'ios'],
+      convertedAt: new Date().toISOString(),
+    },
+  });
+
+  setFlash(req, 'success', `${robot.name} converted for mobile delivery (Android + iOS).`);
+  return res.redirect('/superhost/dashboard#my-robots');
 });
 
 app.post('/superhost/theme', requireAuth, requireRole('superhost'), (req, res) => {
@@ -1183,6 +1320,68 @@ function sumAmount(values) {
   }
 
   return total;
+}
+
+function buildOperatorDashboard(userId, now) {
+  const account = getUserById(userId);
+  if (!account) {
+    return null;
+  }
+
+  const robots = listRobotsByMentor(userId).map((robot) => ({
+    ...robot,
+    allowedSymbols: getMentorAvailableSymbols(robot),
+  }));
+  const licenseKeys = listLicenseKeysByMentor(userId);
+  const clientSubscriptions = listClientSubscriptionsByMentor(userId);
+  const activeKeysUsed = licenseKeys.filter((item) => isLicenseKeyRedeemed(item)).length;
+  const activeSubscribers = clientSubscriptions.filter((item) =>
+    isSubscriptionActiveNow(item, now)
+  ).length;
+  const keysSoldThisMonth = clientSubscriptions.filter((item) =>
+    isInSameMonth(item.startedAt, now)
+  ).length;
+  const robotPricePerKey = toNonNegativeNumber(account.robotPricePerKey);
+  const monthlyKeyTarget = toNonNegativeInteger(account.monthlyKeyTarget, 10);
+  const monthlyRevenue = toCurrencyNumber(
+    sumAmount(
+      clientSubscriptions
+        .filter((item) => isInSameMonth(item.startedAt, now))
+        .map((item) => item.amountZar)
+    )
+  );
+  const estimatedTotalRevenue = toCurrencyNumber(
+    sumAmount(clientSubscriptions.map((item) => item.amountZar))
+  );
+  const projectedRevenueByMentorPrice = toCurrencyNumber(keysSoldThisMonth * robotPricePerKey);
+  const targetRemaining = Math.max(monthlyKeyTarget - keysSoldThisMonth, 0);
+  const targetProgressPercent =
+    monthlyKeyTarget > 0 ? Math.min(100, Math.round((keysSoldThisMonth / monthlyKeyTarget) * 100)) : 0;
+
+  return {
+    account,
+    robots,
+    licenseKeys,
+    clientSubscriptions,
+    activeKeysUsed,
+    dashboardTotals: {
+      totalKeys: account.licenseKeyLimit,
+      totalGenerated: licenseKeys.length,
+      activeSubscribers,
+    },
+    businessMetrics: {
+      robotPricePerKey,
+      monthlyKeyTarget,
+      keysSoldThisMonth,
+      monthlyRevenue,
+      estimatedTotalRevenue,
+      projectedRevenueByMentorPrice,
+      targetRemaining,
+      targetProgressPercent,
+      targetReached: monthlyKeyTarget > 0 && keysSoldThisMonth >= monthlyKeyTarget,
+      monthLabel: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+    },
+  };
 }
 
 function parseEmailSet(rawValue, fallbackEmails) {
