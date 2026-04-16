@@ -171,6 +171,26 @@ const LEGACY_INITIAL_THEME = {
   glow: '#ff5eea',
 };
 let cachedLicenseEmailTransporter = null;
+const FOREX_EVENTS_FEED_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+const FOREX_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const FOREX_KEY_EVENT_KEYWORDS = [
+  'cpi',
+  'nfp',
+  'non-farm',
+  'ppi',
+  'fomc',
+  'interest rate',
+  'fed',
+  'ecb',
+  'boe',
+  'gdp',
+  'unemployment',
+  'payrolls',
+];
+let forexEventsCache = {
+  fetchedAtMs: 0,
+  items: [],
+};
 
 ensureDataFile();
 ensureMentorPortalIds();
@@ -206,7 +226,10 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (_req, res) => {
-  res.render('home', { title: APP_NAME });
+  res.render('home', {
+    title: APP_NAME,
+    dashboardDateLabel: formatDashboardDate(new Date()),
+  });
 });
 
 app.get('/platform', (_req, res) => {
@@ -734,12 +757,15 @@ app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
   return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
 });
 
-app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), (req, res) => {
-  const dashboard = buildOperatorDashboard(req.currentUser.id, new Date());
+app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res) => {
+  const now = new Date();
+  const dashboard = buildOperatorDashboard(req.currentUser.id, now);
   if (!dashboard) {
     setFlash(req, 'error', 'Account not found.');
     return res.redirect('/signin');
   }
+
+  const forexEvents = await getUpcomingForexEvents(now);
 
   res.render('mentor-dashboard', {
     title: 'Mentor Dashboard',
@@ -751,6 +777,8 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), (req, res) => {
     businessMetrics: dashboard.businessMetrics,
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
+    dashboardDateLabel: formatDashboardDate(now),
+    forexEvents,
   });
 });
 
@@ -799,13 +827,19 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const name = String(body.name || '').trim();
   if (!name) {
-    setFlash(req, 'error', 'Robot name is required.');
-    return res.redirect('/mentor/dashboard');
+    setFlash(req, 'error', 'EA name is required (include version).');
+    return res.redirect('/mentor/dashboard#manage-eas');
+  }
+
+  const confirmAdmin = String(body.confirmAdmin || '').trim().toLowerCase();
+  if (confirmAdmin !== 'yes') {
+    setFlash(req, 'error', 'Please confirm that you are an admin before adding a new EA.');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const parseNumber = (value, fallback = 0) => {
@@ -832,20 +866,20 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   });
 
   setFlash(req, 'success', 'Robot profile created successfully.');
-  return res.redirect('/mentor/dashboard');
+  return res.redirect('/mentor/dashboard#manage-eas');
 });
 
 app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), (req, res) => {
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const allowedSymbols = parseSymbolsInput(req.body && req.body.allowedSymbols);
   if (!allowedSymbols.length) {
     setFlash(req, 'error', 'Add at least one symbol for this robot.');
-    return res.redirect('/mentor/dashboard#my-robots');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   updateRobot(robot.id, {
@@ -853,7 +887,7 @@ app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), 
   });
 
   setFlash(req, 'success', `Allowed symbols updated for ${robot.name}.`);
-  return res.redirect('/mentor/dashboard#my-robots');
+  return res.redirect('/mentor/dashboard#manage-eas');
 });
 
 app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), async (req, res) => {
@@ -861,7 +895,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
@@ -873,22 +907,22 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
 
   if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
     setFlash(req, 'error', 'Client email is required and must be valid.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Choose a valid expert advisor (robot) first.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   if (!durationOption) {
     setFlash(req, 'error', 'Choose a valid key duration.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   if (totalGenerated >= mentor.licenseKeyLimit) {
     setFlash(req, 'error', 'License limit reached. Ask the superhost to increase your limit.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const createdAt = new Date();
@@ -905,7 +939,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   });
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/mentor/dashboard#client-keys');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const emailResult = await sendLicenseKeyEmail({
@@ -935,20 +969,20 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
       `Key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
-  return res.redirect('/mentor/dashboard#client-keys');
+  return res.redirect('/mentor/dashboard#manage-eas');
 });
 
 app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('mentor'), (req, res) => {
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/mentor/dashboard');
+    return res.redirect('/mentor/dashboard#manage-eas');
   }
 
   updateRobot(robot.id, {
@@ -960,13 +994,14 @@ app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('men
   });
 
   setFlash(req, 'success', `${robot.name} converted for mobile delivery (Android + iOS).`);
-  return res.redirect('/mentor/dashboard');
+  return res.redirect('/mentor/dashboard#manage-eas');
 });
 
-app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, res) => {
+app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (_req, res) => {
   const now = new Date();
   const currentSection = normalizeSuperhostDashboardSection(_req.query && _req.query.section);
   const superhostLab = buildOperatorDashboard(_req.currentUser.id, now);
+  const forexEvents = await getUpcomingForexEvents(now);
   const mentors = listMentors().map((mentor) => {
     const robots = listRobotsByMentor(mentor.id);
     const keys = listLicenseKeysByMentor(mentor.id);
@@ -1000,6 +1035,8 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), (_req, re
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
     currentSection,
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
+    dashboardDateLabel: formatDashboardDate(now),
+    forexEvents,
   });
 });
 
@@ -1048,13 +1085,19 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
     setFlash(req, 'error', 'Superhost lab subscription is inactive.');
-    return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const name = String(body.name || '').trim();
   if (!name) {
-    setFlash(req, 'error', 'Robot name is required.');
-    return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
+    setFlash(req, 'error', 'EA name is required (include version).');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
+  }
+
+  const confirmAdmin = String(body.confirmAdmin || '').trim().toLowerCase();
+  if (confirmAdmin !== 'yes') {
+    setFlash(req, 'error', 'Please confirm that you are an admin before adding a new EA.');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const parseNumber = (value, fallback = 0) => {
@@ -1080,7 +1123,7 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
   });
 
   setFlash(req, 'success', 'Superhost test robot profile created.');
-  return res.redirect('/superhost/dashboard?section=create-robot#create-robot');
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
 app.post('/superhost/robots/:robotId/symbols', requireAuth, requireRole('superhost'), (req, res) => {
@@ -1108,7 +1151,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
     setFlash(req, 'error', 'Superhost lab subscription is inactive.');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const body = req.body || {};
@@ -1119,22 +1162,22 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
   const totalGenerated = listLicenseKeysByMentor(req.currentUser.id).length;
   if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
     setFlash(req, 'error', 'Client email is required and must be valid.');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Choose a valid expert advisor (robot).');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   if (!durationOption) {
     setFlash(req, 'error', 'Choose a valid key duration.');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   if (totalGenerated >= superhost.licenseKeyLimit) {
     setFlash(req, 'error', 'You reached your current superhost test key limit.');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const createdAt = new Date();
@@ -1152,7 +1195,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
 
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
   const emailResult = await sendLicenseKeyEmail({
@@ -1182,7 +1225,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
       `New key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
-  return res.redirect('/superhost/dashboard?section=client-keys#client-keys');
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
 app.post('/superhost/robots/:robotId/convert-mobile', requireAuth, requireRole('superhost'), (req, res) => {
@@ -1339,14 +1382,16 @@ function requireRole(role) {
 
 function normalizeSuperhostDashboardSection(value) {
   const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'client-keys' || normalized === 'create-robot') {
+    return 'my-robots';
+  }
   const allowed = new Set([
     'overview',
     'users',
     'my-profile',
     'track-business',
-    'client-keys',
-    'create-robot',
     'my-robots',
+    'forex-events',
     'portal-theme',
   ]);
 
@@ -1355,6 +1400,133 @@ function normalizeSuperhostDashboardSection(value) {
   }
 
   return normalized;
+}
+
+async function getUpcomingForexEvents(nowDate = new Date()) {
+  const windowStart = new Date(nowDate.getTime());
+  const windowEnd = new Date(nowDate.getTime());
+  windowEnd.setDate(windowEnd.getDate() + 14);
+  windowEnd.setHours(23, 59, 59, 999);
+
+  const feedItems = await fetchForexEventsFeedItems();
+  const normalizedItems = feedItems
+    .map(normalizeForexEventItem)
+    .filter(Boolean)
+    .filter((item) => item.date.getTime() >= windowStart.getTime())
+    .filter((item) => item.date.getTime() <= windowEnd.getTime())
+    .filter(isRelevantForexEvent)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 20)
+    .map((item) => {
+      const dayLabel = new Intl.DateTimeFormat('en-ZA', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        timeZone: 'Africa/Johannesburg',
+      }).format(item.date);
+      const timeLabel = new Intl.DateTimeFormat('en-ZA', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Africa/Johannesburg',
+      }).format(item.date);
+      return {
+        title: item.title,
+        country: item.country,
+        impact: item.impact,
+        forecast: item.forecast,
+        previous: item.previous,
+        dayLabel,
+        timeLabel,
+      };
+    });
+
+  return {
+    fromLabel: formatDashboardDate(windowStart),
+    toLabel: formatDashboardDate(windowEnd),
+    items: normalizedItems,
+  };
+}
+
+async function fetchForexEventsFeedItems() {
+  const nowMs = Date.now();
+  if (
+    forexEventsCache &&
+    Array.isArray(forexEventsCache.items) &&
+    nowMs - Number(forexEventsCache.fetchedAtMs || 0) < FOREX_EVENTS_CACHE_TTL_MS
+  ) {
+    return forexEventsCache.items;
+  }
+
+  try {
+    const response = await fetch(FOREX_EVENTS_FEED_URL);
+    if (!response.ok) {
+      return Array.isArray(forexEventsCache.items) ? forexEventsCache.items : [];
+    }
+
+    const payload = await response.json();
+    const items = Array.isArray(payload) ? payload : [];
+    forexEventsCache = {
+      fetchedAtMs: nowMs,
+      items,
+    };
+    return items;
+  } catch (_error) {
+    return Array.isArray(forexEventsCache.items) ? forexEventsCache.items : [];
+  }
+}
+
+function normalizeForexEventItem(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const title = String(item.title || '').trim();
+  const country = String(item.country || '').trim() || 'FX';
+  const impact = String(item.impact || '').trim() || 'Low';
+  const forecast = String(item.forecast || '').trim();
+  const previous = String(item.previous || '').trim();
+  const dateRaw = String(item.date || '').trim();
+  if (!title || !dateRaw) {
+    return null;
+  }
+
+  const date = new Date(dateRaw);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return {
+    title,
+    country,
+    impact,
+    forecast,
+    previous,
+    date,
+  };
+}
+
+function isRelevantForexEvent(eventItem) {
+  const impact = String(eventItem.impact || '').trim().toLowerCase();
+  if (impact === 'high' || impact === 'medium') {
+    return true;
+  }
+
+  const title = String(eventItem.title || '').trim().toLowerCase();
+  return FOREX_KEY_EVENT_KEYWORDS.some((keyword) => title.includes(keyword));
+}
+
+function formatDashboardDate(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Africa/Johannesburg',
+  }).format(date);
 }
 
 function bootstrapSuperhost() {

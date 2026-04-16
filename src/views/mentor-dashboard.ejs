@@ -48,35 +48,105 @@
 
     <div class="sidebar-group">
       <h2>Core</h2>
-      <a href="#overview" class="sidebar-link"><span class="nav-icon">DB</span>Dashboard</a>
-      <a href="#track-business" class="sidebar-link"><span class="nav-icon">TS</span>Track Business</a>
-      <a href="#client-keys" class="sidebar-link"><span class="nav-icon">KY</span>Generate Key</a>
-      <a href="#my-robots" class="sidebar-link"><span class="nav-icon">EA</span>Manage EAs</a>
+      <a href="#overview" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.1"></rect>
+          </svg>
+        </span>
+        Dashboard
+      </a>
+      <a href="#track-business" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3.5 17.5L9 12l3.2 3.2L20.5 7"></path>
+            <path d="M14.5 7h6v6"></path>
+          </svg>
+        </span>
+        Track Business
+      </a>
+      <a href="#manage-eas" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="4.5" y="7.5" width="15" height="11" rx="2.2"></rect>
+            <path d="M12 3.5v4"></path>
+            <circle cx="9.2" cy="12.2" r="1"></circle>
+            <circle cx="14.8" cy="12.2" r="1"></circle>
+            <path d="M9 15.3h6"></path>
+          </svg>
+        </span>
+        Manage EAs
+      </a>
+      <a href="#forex-events" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5.5h16"></path>
+            <path d="M4 12h16"></path>
+            <path d="M4 18.5h16"></path>
+            <circle cx="8" cy="5.5" r="1.2"></circle>
+            <circle cx="14" cy="12" r="1.2"></circle>
+            <circle cx="10" cy="18.5" r="1.2"></circle>
+          </svg>
+        </span>
+        Forex Events
+      </a>
     </div>
 
     <div class="sidebar-group">
       <h2>Management</h2>
-      <a href="#create-robot" class="sidebar-link"><span class="nav-icon">CR</span>Create Robot</a>
-      <a href="#my-profile" class="sidebar-link"><span class="nav-icon">PF</span>My Profile</a>
+      <a href="#my-profile" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="3.2"></circle>
+            <path d="M5 19c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5"></path>
+          </svg>
+        </span>
+        My Profile
+      </a>
     </div>
   </aside>
 
   <div class="mentor-main">
-    <section class="totals-grid" id="overview">
-      <article class="panel total-card">
-        <h3>Total Keys</h3>
-        <p class="total-value"><%= dashboardTotals.totalKeys %></p>
+    <section class="dashboard-overview" id="overview">
+      <div class="overview-top-row">
+        <p class="status-pill ok"><span>●</span>All systems running smoothly</p>
+        <p class="status-pill"><span>📅</span>Today — <%= dashboardDateLabel %></p>
+      </div>
+
+      <article class="panel welcome-banner">
+        <div class="welcome-icon" aria-hidden="true">🛡️</div>
+        <div>
+          <h2>Welcome back!</h2>
+          <p class="welcome-sub">You have <strong><%= dashboardTotals.activeSubscribers %> active licenses</strong> running on your account.</p>
+          <p class="mentor-id-pill">Mentor ID: <strong><%= mentor.mentorPortalId %></strong></p>
+        </div>
       </article>
 
-      <article class="panel total-card">
-        <h3>Total Generated</h3>
-        <p class="total-value"><%= dashboardTotals.totalGenerated %></p>
-      </article>
-
-      <article class="panel total-card">
-        <h3>Active Subscribers</h3>
-        <p class="total-value"><%= dashboardTotals.activeSubscribers %></p>
-      </article>
+      <div class="kpi-grid">
+        <article class="kpi-card red">
+          <h3>Total Licenses</h3>
+          <p class="kpi-value"><%= dashboardTotals.totalGenerated %></p>
+          <p>All time generated keys</p>
+        </article>
+        <article class="kpi-card green">
+          <h3>Active Subscriptions</h3>
+          <p class="kpi-value"><%= dashboardTotals.activeSubscribers %></p>
+          <p>Currently active users</p>
+        </article>
+        <article class="kpi-card blue">
+          <h3>Total EAs</h3>
+          <p class="kpi-value"><%= robots.length %></p>
+          <p>Expert Advisors registered</p>
+        </article>
+        <article class="kpi-card orange">
+          <h3>Maximum Licenses</h3>
+          <p class="kpi-value"><%= mentor.licenseKeyLimit %></p>
+          <p>Current key cap</p>
+        </article>
+      </div>
     </section>
 
     <section class="panel-grid single" id="my-profile">
@@ -220,7 +290,7 @@
       </article>
     </section>
 
-    <section class="stats-grid">
+    <section class="panel-grid single">
       <article class="panel">
         <h2>Account Status</h2>
         <p><strong>Mentor ID:</strong> <%= mentor.mentorPortalId %></p>
@@ -229,80 +299,12 @@
         <p><strong>Subscription Active:</strong> <%= mentor.subscriptionActive ? 'Yes' : 'No' %></p>
         <p><strong>License Keys Used:</strong> <%= activeKeysUsed %> / <%= mentor.licenseKeyLimit %></p>
       </article>
-
-      <article class="panel" id="client-keys">
-        <h2>Client Keys</h2>
-        <p class="hint">
-          Issue a key by client email, EA, and duration. The key is emailed automatically and can also be copied here.
-        </p>
-        <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
-          <label>
-            Client Email
-            <input type="email" name="clientEmail" placeholder="client@example.com" required />
-          </label>
-
-          <label>
-            Expert Advisor (Robot)
-            <select name="robotId" required>
-              <option value="">Select robot</option>
-              <% robots.forEach((robot) => { %>
-              <option value="<%= robot.id %>"><%= robot.name %></option>
-              <% }) %>
-            </select>
-          </label>
-
-          <label>
-            License Key Duration
-            <select name="durationCode" required>
-              <option value="">Select duration</option>
-              <% licenseDurationOptions.forEach((item) => { %>
-              <option value="<%= item.code %>"><%= item.label %></option>
-              <% }) %>
-            </select>
-          </label>
-          <button type="submit" class="button" <%= robots.length ? '' : 'disabled' %>>
-            Generate & Email Key
-          </button>
-        </form>
-
-        <% if (!robots.length) { %>
-        <p class="hint">Create at least one robot first before generating license keys.</p>
-        <% } %>
-
-        <% if (!licenseKeys.length) { %>
-        <p class="hint">No client keys generated yet.</p>
-        <% } else { %>
-        <ul class="list key-list">
-          <% licenseKeys.forEach((item) => { %>
-          <li class="key-entry">
-            <div class="key-copy-row">
-              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
-              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
-            </div>
-            <p class="hint">
-              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
-              EA: <strong><%= item.robotName || 'Not set' %></strong> |
-              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
-            </p>
-            <% if (item.redeemedAt || item.status === 'redeemed') { %>
-            <span class="pill ok">redeemed</span>
-            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
-            <% } else if (item.reservedClientEmail) { %>
-            <span class="pill">reserved</span>
-            <span class="hint">for <%= item.reservedClientEmail %></span>
-            <% } else { %>
-            <span class="pill">available</span>
-            <% } %>
-          </li>
-          <% }) %>
-        </ul>
-        <% } %>
-      </article>
     </section>
 
-    <section class="panel-grid single" id="create-robot">
+    <section class="panel-grid single" id="manage-eas">
       <article class="panel">
-        <h2>Create Robot Profile</h2>
+        <h2>Manage EAs</h2>
+        <p class="hint">Add a new Expert Advisor first, confirm admin access, then continue with full EA details.</p>
 
         <% if (!mentor.subscriptionActive) { %>
         <p class="warning">
@@ -312,8 +314,13 @@
 
         <form action="/mentor/robots" method="POST" class="stack-form">
           <label>
-            Robot Name
-            <input type="text" name="name" required />
+            EA Name (Include Version)
+            <input type="text" name="name" placeholder="ALGO NOVA EA v6" required />
+          </label>
+
+          <label class="confirm-check">
+            <input type="checkbox" name="confirmAdmin" value="yes" required />
+            <span>I confirm that I am an admin</span>
           </label>
 
           <label>
@@ -381,14 +388,79 @@
             </label>
           </div>
 
-          <button type="submit" class="button">Create Robot</button>
+          <button type="submit" class="button">Add EA</button>
         </form>
+
+        <hr class="subtle-divider" />
+
+        <h3>Manage Keys</h3>
+        <p class="hint">
+          Issue a key by client email, EA, and duration. The key is emailed automatically and can also be copied here.
+        </p>
+        <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
+          <label>
+            Client Email
+            <input type="email" name="clientEmail" placeholder="client@example.com" required />
+          </label>
+
+          <label>
+            Expert Advisor (Robot)
+            <select name="robotId" required>
+              <option value="">Select robot</option>
+              <% robots.forEach((robot) => { %>
+              <option value="<%= robot.id %>"><%= robot.name %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label>
+            License Key Duration
+            <select name="durationCode" required>
+              <option value="">Select duration</option>
+              <% licenseDurationOptions.forEach((item) => { %>
+              <option value="<%= item.code %>"><%= item.label %></option>
+              <% }) %>
+            </select>
+          </label>
+          <button type="submit" class="button" <%= robots.length ? '' : 'disabled' %>>
+            Generate & Email Key
+          </button>
+        </form>
+
+        <% if (!licenseKeys.length) { %>
+        <p class="hint">No client keys generated yet.</p>
+        <% } else { %>
+        <ul class="list key-list">
+          <% licenseKeys.forEach((item) => { %>
+          <li class="key-entry">
+            <div class="key-copy-row">
+              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
+              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+            </div>
+            <p class="hint">
+              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
+              EA: <strong><%= item.robotName || 'Not set' %></strong> |
+              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
+            </p>
+            <% if (item.redeemedAt || item.status === 'redeemed') { %>
+            <span class="pill ok">redeemed</span>
+            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
+            <% } else if (item.reservedClientEmail) { %>
+            <span class="pill">reserved</span>
+            <span class="hint">for <%= item.reservedClientEmail %></span>
+            <% } else { %>
+            <span class="pill">available</span>
+            <% } %>
+          </li>
+          <% }) %>
+        </ul>
+        <% } %>
       </article>
     </section>
 
     <section class="panel-grid single" id="my-robots">
       <article class="panel">
-        <h2>Your Robot Profiles</h2>
+        <h2>Your Expert Advisors</h2>
 
         <% if (!robots.length) { %>
         <p class="hint">No robots created yet.</p>
@@ -458,6 +530,32 @@
               <% }) %>
             </tbody>
           </table>
+        </div>
+        <% } %>
+      </article>
+    </section>
+
+    <section class="panel-grid single" id="forex-events">
+      <article class="panel">
+        <h2>Forex Events</h2>
+        <p class="hint">Showing upcoming events from <strong><%= forexEvents.fromLabel %></strong> to <strong><%= forexEvents.toLabel %></strong>. Past history is excluded automatically.</p>
+
+        <% if (!forexEvents.items.length) { %>
+        <p class="hint">No upcoming high-priority forex events are available right now.</p>
+        <% } else { %>
+        <div class="events-list">
+          <% forexEvents.items.forEach((event) => { %>
+          <article class="event-row">
+            <div>
+              <p class="event-title"><%= event.title %></p>
+              <p class="hint"><%= event.dayLabel %> • <%= event.timeLabel %> (SAST)</p>
+            </div>
+            <div class="event-meta">
+              <span class="pill"><%= event.country %></span>
+              <span class="pill <%= String(event.impact || '').toLowerCase() === 'high' ? 'off' : 'ok' %>"><%= event.impact %></span>
+            </div>
+          </article>
+          <% }) %>
         </div>
         <% } %>
       </article>

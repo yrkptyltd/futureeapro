@@ -56,37 +56,127 @@
 
     <div class="sidebar-group">
       <h2>Core</h2>
-      <a href="/superhost/dashboard?section=overview#overview" class="sidebar-link <%= activeSection === 'overview' ? 'active' : '' %>"><span class="nav-icon">DB</span>Dashboard</a>
-      <a href="/superhost/dashboard?section=users#users" class="sidebar-link <%= activeSection === 'users' ? 'active' : '' %>"><span class="nav-icon">US</span>Users</a>
-      <a href="/superhost/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>"><span class="nav-icon">TS</span>Track Business</a>
+      <a href="/superhost/dashboard?section=overview#overview" class="sidebar-link <%= activeSection === 'overview' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.1"></rect>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="1.1"></rect>
+          </svg>
+        </span>
+        Dashboard
+      </a>
+      <a href="/superhost/dashboard?section=users#users" class="sidebar-link <%= activeSection === 'users' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="8" cy="9" r="2.6"></circle>
+            <circle cx="16.2" cy="9.8" r="2.1"></circle>
+            <path d="M3.8 19c1.2-2.8 3.2-4.2 6.1-4.2 2.8 0 4.8 1.4 6 4.2"></path>
+            <path d="M14 19c.8-1.8 2.1-2.8 4-2.8 1 0 1.8.2 2.5.6"></path>
+          </svg>
+        </span>
+        Users
+      </a>
+      <a href="/superhost/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3.5 17.5L9 12l3.2 3.2L20.5 7"></path>
+            <path d="M14.5 7h6v6"></path>
+          </svg>
+        </span>
+        Track Business
+      </a>
+      <a href="/superhost/dashboard?section=forex-events#forex-events" class="sidebar-link <%= activeSection === 'forex-events' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5.5h16"></path>
+            <path d="M4 12h16"></path>
+            <path d="M4 18.5h16"></path>
+            <circle cx="8" cy="5.5" r="1.2"></circle>
+            <circle cx="14" cy="12" r="1.2"></circle>
+            <circle cx="10" cy="18.5" r="1.2"></circle>
+          </svg>
+        </span>
+        Forex Events
+      </a>
     </div>
 
     <div class="sidebar-group">
       <h2>Lab</h2>
-      <a href="/superhost/dashboard?section=client-keys#client-keys" class="sidebar-link <%= activeSection === 'client-keys' ? 'active' : '' %>"><span class="nav-icon">KY</span>Generate Key</a>
-      <a href="/superhost/dashboard?section=create-robot#create-robot" class="sidebar-link <%= activeSection === 'create-robot' ? 'active' : '' %>"><span class="nav-icon">CR</span>Create Robot</a>
-      <a href="/superhost/dashboard?section=my-robots#my-robots" class="sidebar-link <%= activeSection === 'my-robots' ? 'active' : '' %>"><span class="nav-icon">EA</span>Manage EAs</a>
-      <a href="/superhost/dashboard?section=portal-theme#portal-theme" class="sidebar-link <%= activeSection === 'portal-theme' ? 'active' : '' %>"><span class="nav-icon">TH</span>Portal Theme</a>
-      <a href="/superhost/dashboard?section=my-profile#my-profile" class="sidebar-link <%= activeSection === 'my-profile' ? 'active' : '' %>"><span class="nav-icon">PF</span>My Profile</a>
+      <a href="/superhost/dashboard?section=my-robots#my-robots" class="sidebar-link <%= activeSection === 'my-robots' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="4.5" y="7.5" width="15" height="11" rx="2.2"></rect>
+            <path d="M12 3.5v4"></path>
+            <circle cx="9.2" cy="12.2" r="1"></circle>
+            <circle cx="14.8" cy="12.2" r="1"></circle>
+            <path d="M9 15.3h6"></path>
+          </svg>
+        </span>
+        Manage EAs
+      </a>
+      <a href="/superhost/dashboard?section=portal-theme#portal-theme" class="sidebar-link <%= activeSection === 'portal-theme' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 4.2a7.8 7.8 0 1 0 0 15.6h.3c1.6 0 2.3-1 2.3-2 0-.7-.3-1.3-.3-2 0-1.1.8-2 2.1-2h1.2a2.9 2.9 0 0 0 2.9-2.8A6.8 6.8 0 0 0 12 4.2z"></path>
+            <circle cx="7.9" cy="11" r="1"></circle>
+            <circle cx="11.2" cy="8.3" r="1"></circle>
+            <circle cx="15.1" cy="9.2" r="1"></circle>
+          </svg>
+        </span>
+        Portal Theme
+      </a>
+      <a href="/superhost/dashboard?section=my-profile#my-profile" class="sidebar-link <%= activeSection === 'my-profile' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="3.2"></circle>
+            <path d="M5 19c1.6-3 4-4.5 7-4.5s5.4 1.5 7 4.5"></path>
+          </svg>
+        </span>
+        My Profile
+      </a>
     </div>
   </aside>
 
   <div class="mentor-main">
-    <section class="totals-grid <%= activeSection === 'overview' ? '' : 'section-hidden' %>" id="overview">
-      <article class="panel total-card">
-        <h3>Total Keys</h3>
-        <p class="total-value"><%= platformTotals.totalKeys %></p>
+    <section class="dashboard-overview <%= activeSection === 'overview' ? '' : 'section-hidden' %>" id="overview">
+      <div class="overview-top-row">
+        <p class="status-pill ok"><span>●</span>All systems running smoothly</p>
+        <p class="status-pill"><span>📅</span>Today — <%= dashboardDateLabel %></p>
+      </div>
+
+      <article class="panel welcome-banner">
+        <div class="welcome-icon" aria-hidden="true">🛡️</div>
+        <div>
+          <h2>Welcome back!</h2>
+          <p class="welcome-sub">You are monitoring <strong><%= platformTotals.activeSubscribers %> active subscriptions</strong> across the portal.</p>
+          <p class="mentor-id-pill">Superhost: <strong><%= currentUser.email %></strong></p>
+        </div>
       </article>
 
-      <article class="panel total-card">
-        <h3>Total Generated</h3>
-        <p class="total-value"><%= platformTotals.totalGenerated %></p>
-      </article>
-
-      <article class="panel total-card">
-        <h3>Active Subscribers</h3>
-        <p class="total-value"><%= platformTotals.activeSubscribers %></p>
-      </article>
+      <div class="kpi-grid">
+        <article class="kpi-card red">
+          <h3>Total Licenses</h3>
+          <p class="kpi-value"><%= platformTotals.totalGenerated %></p>
+          <p>All generated keys</p>
+        </article>
+        <article class="kpi-card green">
+          <h3>Active Subscriptions</h3>
+          <p class="kpi-value"><%= platformTotals.activeSubscribers %></p>
+          <p>Live paid clients</p>
+        </article>
+        <article class="kpi-card blue">
+          <h3>Total Mentors</h3>
+          <p class="kpi-value"><%= platformTotals.totalMentors %></p>
+          <p>Mentors on portal</p>
+        </article>
+        <article class="kpi-card orange">
+          <h3>Maximum Licenses</h3>
+          <p class="kpi-value"><%= platformTotals.totalKeys %></p>
+          <p>Combined mentor key limits</p>
+        </article>
+      </div>
     </section>
 
     <section class="panel-grid single <%= activeSection === 'users' ? '' : 'section-hidden' %>" id="users">
@@ -409,8 +499,154 @@
 
     <section class="panel-grid single <%= activeSection === 'my-robots' ? '' : 'section-hidden' %>" id="my-robots">
       <article class="panel">
-        <h2>Your Robot Profiles (Superhost Test Lab)</h2>
+        <h2>Manage EAs (Superhost Test Lab)</h2>
+        <p class="hint">Create EAs, issue keys, and maintain symbols from one clean section.</p>
+        <p><strong>License Keys Used:</strong> <%= labActiveKeysUsed %> / <%= labAccount.licenseKeyLimit %></p>
 
+        <% if (!labAccount.subscriptionActive) { %>
+        <p class="warning">Superhost lab subscription is inactive.</p>
+        <% } %>
+
+        <form action="/superhost/robots" method="POST" class="stack-form">
+          <label>
+            EA Name (Include Version)
+            <input type="text" name="name" placeholder="ALGO NOVA EA v6" required />
+          </label>
+
+          <label class="confirm-check">
+            <input type="checkbox" name="confirmAdmin" value="yes" required />
+            <span>I confirm that I am an admin</span>
+          </label>
+
+          <label>
+            Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+
+          <label>
+            Category
+            <input type="text" name="category" placeholder="Trading bot, assistant, support" />
+          </label>
+
+          <label>
+            Robot Picture URL (Shown on client app)
+            <input type="url" name="imageUrl" placeholder="https://..." />
+          </label>
+
+          <label>
+            Symbols (comma or new line separated)
+            <textarea name="allowedSymbols" rows="2" placeholder="XAUUSD, GBPUSD, .US30., BTCUSD"><%= defaultSymbolsText %></textarea>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Version
+              <input type="text" name="version" placeholder="v1.0.0" />
+            </label>
+
+            <label>
+              Status
+              <select name="status">
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+              </select>
+            </label>
+          </div>
+
+          <h3>Key Stats</h3>
+          <div class="row-fields">
+            <label>
+              Uptime (hours)
+              <input type="number" step="1" name="uptimeHours" value="0" />
+            </label>
+
+            <label>
+              Tasks Completed
+              <input type="number" step="1" name="tasksCompleted" value="0" />
+            </label>
+          </div>
+
+          <div class="row-fields">
+            <label>
+              Success Rate (%)
+              <input type="number" step="0.01" name="successRate" value="0" />
+            </label>
+
+            <label>
+              Last Sync
+              <input type="text" name="lastSync" placeholder="2026-04-14T10:00:00Z" />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Add EA</button>
+        </form>
+
+        <hr class="subtle-divider" />
+
+        <h3>Manage Keys</h3>
+        <form action="/superhost/license-keys/generate" method="POST" class="stack-form">
+          <label>
+            Client Email
+            <input type="email" name="clientEmail" placeholder="client@example.com" required />
+          </label>
+
+          <label>
+            Expert Advisor (Robot)
+            <select name="robotId" required>
+              <option value="">Select robot</option>
+              <% labRobots.forEach((robot) => { %>
+              <option value="<%= robot.id %>"><%= robot.name %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label>
+            License Key Duration
+            <select name="durationCode" required>
+              <option value="">Select duration</option>
+              <% licenseDurationOptions.forEach((item) => { %>
+              <option value="<%= item.code %>"><%= item.label %></option>
+              <% }) %>
+            </select>
+          </label>
+          <button type="submit" class="button" <%= labRobots.length ? '' : 'disabled' %>>
+            Generate & Email Key
+          </button>
+        </form>
+
+        <% if (!labLicenseKeys.length) { %>
+        <p class="hint">No client keys generated yet.</p>
+        <% } else { %>
+        <ul class="list key-list">
+          <% labLicenseKeys.forEach((item) => { %>
+          <li class="key-entry">
+            <div class="key-copy-row">
+              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
+              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+            </div>
+            <p class="hint">
+              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
+              EA: <strong><%= item.robotName || 'Not set' %></strong> |
+              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
+            </p>
+            <% if (item.redeemedAt || item.status === 'redeemed') { %>
+            <span class="pill ok">redeemed</span>
+            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
+            <% } else if (item.reservedClientEmail) { %>
+            <span class="pill">reserved</span>
+            <span class="hint">for <%= item.reservedClientEmail %></span>
+            <% } else { %>
+            <span class="pill">available</span>
+            <% } %>
+          </li>
+          <% }) %>
+        </ul>
+        <% } %>
+
+        <hr class="subtle-divider" />
+
+        <h3>Your Expert Advisors</h3>
         <% if (!labRobots.length) { %>
         <p class="hint">No robots created yet.</p>
         <% } else { %>
@@ -471,6 +707,32 @@
               <% }) %>
             </tbody>
           </table>
+        </div>
+        <% } %>
+      </article>
+    </section>
+
+    <section class="panel-grid single <%= activeSection === 'forex-events' ? '' : 'section-hidden' %>" id="forex-events">
+      <article class="panel">
+        <h2>Forex Events</h2>
+        <p class="hint">Showing upcoming events from <strong><%= forexEvents.fromLabel %></strong> to <strong><%= forexEvents.toLabel %></strong>. Past history is excluded automatically.</p>
+
+        <% if (!forexEvents.items.length) { %>
+        <p class="hint">No upcoming high-priority forex events are available right now.</p>
+        <% } else { %>
+        <div class="events-list">
+          <% forexEvents.items.forEach((event) => { %>
+          <article class="event-row">
+            <div>
+              <p class="event-title"><%= event.title %></p>
+              <p class="hint"><%= event.dayLabel %> • <%= event.timeLabel %> (SAST)</p>
+            </div>
+            <div class="event-meta">
+              <span class="pill"><%= event.country %></span>
+              <span class="pill <%= String(event.impact || '').toLowerCase() === 'high' ? 'off' : 'ok' %>"><%= event.impact %></span>
+            </div>
+          </article>
+          <% }) %>
         </div>
         <% } %>
       </article>

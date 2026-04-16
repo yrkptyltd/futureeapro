@@ -1,33 +1,48 @@
 <%- include('partials/top', { title: title }) %>
 
-<section class="hero public-hero">
-  <p class="hero-badge">Mobile EA Hosting</p>
-  <h1>Mobile EA Hosting Service</h1>
-  <p>
-    Future EA Pro hosts mentor robots for Android and iOS with low latency and
-    always-on performance.
-  </p>
-
-  <div class="cta-row">
-    <a class="button" href="/download/android">Get Android Now</a>
-    <a class="button secondary" href="/client">Get iOS Now</a>
-    <a class="button ghost" href="/signin">Reactivate Account</a>
+<section class="dashboard-overview">
+  <div class="overview-top-row">
+    <p class="status-pill ok"><span>●</span>All systems running smoothly</p>
+    <p class="status-pill"><span>📅</span>Today — <%= dashboardDateLabel %></p>
   </div>
 
-  <details class="install-guide">
-    <summary>How to Install iOS</summary>
-    <ol>
-      <li>Tap <strong>Get iOS Now</strong> and open in Safari.</li>
-      <li>Tap Share, then choose <strong>Add to Home Screen</strong>.</li>
-      <li>Launch the app icon from your home screen.</li>
-    </ol>
-  </details>
+  <article class="panel welcome-banner">
+    <div class="welcome-icon" aria-hidden="true">⚡</div>
+    <div>
+      <h2>Future EA Pro Portal</h2>
+      <p class="welcome-sub">Host mentor robots, manage EA keys, and deliver Android + iOS access from one platform.</p>
+      <p class="mentor-id-pill"><strong>24/7 Live</strong> • Secure EA Delivery</p>
+    </div>
+  </article>
+
+  <div class="kpi-grid">
+    <article class="kpi-card red">
+      <h3>1 Month</h3>
+      <p class="kpi-value">R599</p>
+      <p>Starter subscription</p>
+    </article>
+    <article class="kpi-card green">
+      <h3>3 Months</h3>
+      <p class="kpi-value">R1499</p>
+      <p>Best-value quarterly plan</p>
+    </article>
+    <article class="kpi-card blue">
+      <h3>1 Year</h3>
+      <p class="kpi-value">R4599</p>
+      <p>Full annual access</p>
+    </article>
+    <article class="kpi-card orange">
+      <h3>Platforms</h3>
+      <p class="kpi-value">2</p>
+      <p>Android + iOS delivery</p>
+    </article>
+  </div>
 </section>
 
 <section class="panel-grid home-split">
   <article class="panel quick-card">
     <h2>Mentor Access</h2>
-    <p>Register as a mentor or sign in to manage robots, keys, and subscribers.</p>
+    <p>Create or sign in to your mentor account, then manage EAs, client keys, and subscriber activity.</p>
     <div class="cta-row">
       <a class="button" href="/signup">Mentor Sign Up</a>
       <a class="button secondary" href="/signin">Mentor Sign In</a>
@@ -35,14 +50,21 @@
   </article>
 
   <article class="panel quick-card">
-    <h2>Quick Actions</h2>
-    <p>Public portal actions for new and existing clients.</p>
+    <h2>Client Downloads</h2>
+    <p>Install the client app and unlock robot access with mentor-issued keys.</p>
     <div class="cta-row">
       <a class="button" href="/download/android">Download Android</a>
       <a class="button secondary" href="/client">Download iOS</a>
       <a class="button ghost" href="/signin">Reactivate Account</a>
     </div>
-    <p class="hint">24/7 uptime and mentor-issued license key unlock.</p>
+    <details class="install-guide">
+      <summary>How to Install iOS</summary>
+      <ol>
+        <li>Tap <strong>Download iOS</strong> and open in Safari.</li>
+        <li>Tap Share, then choose <strong>Add to Home Screen</strong>.</li>
+        <li>Launch the app icon from your home screen.</li>
+      </ol>
+    </details>
   </article>
 </section>
 
@@ -58,15 +80,13 @@
   </article>
 
   <article class="panel quick-card pricing-card">
-    <h2>Access Plan</h2>
-    <p class="plan-price">R599</p>
-    <p class="hint">1 Month subscription</p>
+    <h2>Broker Compatibility</h2>
     <ul class="list">
-      <li>3 Months: R1499</li>
-      <li>1 Year: R4599</li>
-      <li>MT4 / MT5 broker support</li>
+      <li>MT4 / MT5 supported</li>
+      <li>Razor Markets supported</li>
+      <li>Custom broker server support</li>
     </ul>
-    <a class="button" href="/client">Get Started</a>
+    <a class="button" href="/client">Open Client Portal</a>
   </article>
 </section>
 
