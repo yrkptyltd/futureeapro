@@ -903,7 +903,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
@@ -915,22 +915,22 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
 
   if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
     setFlash(req, 'error', 'Client email is required and must be valid.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Choose a valid expert advisor (robot) first.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   if (!durationOption) {
     setFlash(req, 'error', 'Choose a valid key duration.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   if (totalGenerated >= mentor.licenseKeyLimit) {
     setFlash(req, 'error', 'License limit reached. Ask the superhost to increase your limit.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   const createdAt = new Date();
@@ -947,7 +947,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   });
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
   const emailResult = await sendLicenseKeyEmail({
@@ -977,7 +977,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
       `Key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
-  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+  return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
 });
 
 app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('mentor'), (req, res) => {
@@ -1622,11 +1622,15 @@ function requireRole(role) {
 
 function normalizeMentorDashboardSection(value) {
   const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'generate-keys') {
+    return 'generate-key';
+  }
   const allowed = new Set([
     'overview',
     'my-profile',
     'track-business',
     'manage-eas',
+    'generate-key',
     'forex-events',
   ]);
 

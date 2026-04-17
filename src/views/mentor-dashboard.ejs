@@ -72,6 +72,17 @@
         </span>
         Manage EAs
       </a>
+      <a href="/mentor/dashboard?section=generate-key#generate-key" class="sidebar-link <%= activeSection === 'generate-key' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M14 3.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-8.8 4.4L8.7 15.4"></path>
+            <path d="M8.7 15.4l-1.2 1.2"></path>
+            <path d="M6.4 16.7l-1.9 1.9 1.5 1.5 1.9-1.9"></path>
+            <circle cx="14" cy="9" r="1.1"></circle>
+          </svg>
+        </span>
+        Generate Key
+      </a>
       <a href="/mentor/dashboard?section=forex-events#forex-events" class="sidebar-link <%= activeSection === 'forex-events' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -279,7 +290,51 @@
 
         <hr class="subtle-divider" />
 
-        <h3>Generate License Key</h3>
+        <h3>Your Expert Advisors</h3>
+        <p class="hint">All EAs registered under your account</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>EA</th>
+                <th>USERS</th>
+                <th>ACTIVE</th>
+                <th>CREATED</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!robots.length) { %>
+              <tr>
+                <td colspan="5" class="hint">No EAs created yet.</td>
+              </tr>
+              <% } else { %>
+              <% robots.forEach((robot) => { %>
+              <tr>
+                <td>
+                  <strong><%= robot.name %></strong>
+                </td>
+                <td><%= robot.totalUsers || 0 %></td>
+                <td><%= robot.activeUsers || 0 %></td>
+                <td><%= robot.createdLabel || '-' %></td>
+                <td>
+                  <form action="/mentor/robots/<%= robot.id %>/test" method="POST" class="inline-form">
+                    <button type="submit" class="button mini secondary">Test</button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel-grid single <%= activeSection === 'generate-key' ? '' : 'section-hidden' %>" id="generate-key">
+      <article class="panel">
+        <h2>Generate License Key</h2>
         <p class="hint">Keys are generated, reserved to the client email, and emailed automatically.</p>
 
         <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
@@ -340,48 +395,6 @@
           <% }) %>
         </ul>
         <% } %>
-
-        <hr class="subtle-divider" />
-
-        <h3>Your Expert Advisors</h3>
-        <p class="hint">All EAs registered under your account</p>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>EA</th>
-                <th>USERS</th>
-                <th>ACTIVE</th>
-                <th>CREATED</th>
-                <th>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (!robots.length) { %>
-              <tr>
-                <td colspan="5" class="hint">No EAs created yet.</td>
-              </tr>
-              <% } else { %>
-              <% robots.forEach((robot) => { %>
-              <tr>
-                <td>
-                  <strong><%= robot.name %></strong>
-                </td>
-                <td><%= robot.totalUsers || 0 %></td>
-                <td><%= robot.activeUsers || 0 %></td>
-                <td><%= robot.createdLabel || '-' %></td>
-                <td>
-                  <form action="/mentor/robots/<%= robot.id %>/test" method="POST" class="inline-form">
-                    <button type="submit" class="button mini secondary">Test</button>
-                  </form>
-                </td>
-              </tr>
-              <% }) %>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
       </article>
     </section>
 
