@@ -1005,6 +1005,23 @@ app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('men
   return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
+app.post('/mentor/robots/:robotId/test', requireAuth, requireRole('mentor'), (req, res) => {
+  const mentor = getUserById(req.currentUser.id);
+  if (!mentor.subscriptionActive) {
+    setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+  }
+
+  const robot = getRobotById(req.params.robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Robot not found.');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+  }
+
+  setFlash(req, 'success', `Test started for ${robot.name}.`);
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+});
+
 app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (req, res) => {
   const now = new Date();
   const query = req.query || {};
@@ -1787,6 +1804,20 @@ function formatDashboardDateTime(dateValue) {
   }).format(date);
 }
 
+function formatTableDateTime(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+  return date
+    .toLocaleString('sv-SE', {
+      hour12: false,
+      timeZone: 'Africa/Johannesburg',
+    })
+    .replace('T', ' ')
+    .replace(',', '');
+}
+
 function bootstrapSuperhost() {
   const users = listUsers();
   const existingByEmail = getUserByEmail(SUPERHOST_EMAIL);
@@ -1930,12 +1961,23 @@ function buildOperatorDashboard(userId, now) {
     return null;
   }
 
-  const robots = listRobotsByMentor(userId).map((robot) => ({
-    ...robot,
-    allowedSymbols: getMentorAvailableSymbols(robot),
-  }));
   const licenseKeys = listLicenseKeysByMentor(userId);
   const clientSubscriptions = listClientSubscriptionsByMentor(userId);
+  const robots = listRobotsByMentor(userId)
+    .map((robot) => ({
+      ...robot,
+      allowedSymbols: getMentorAvailableSymbols(robot),
+      totalUsers: licenseKeys.filter((item) => item.robotId === robot.id).length,
+      activeUsers: clientSubscriptions.filter(
+        (item) => item.robotId === robot.id && isSubscriptionActiveNow(item, now)
+      ).length,
+      createdLabel: formatTableDateTime(robot.createdAt),
+    }))
+    .sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      return bTime - aTime;
+    });
   const activeKeysUsed = licenseKeys.filter((item) => isLicenseKeyRedeemed(item)).length;
   const activeSubscribers = clientSubscriptions.filter((item) =>
     isSubscriptionActiveNow(item, now)

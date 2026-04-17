@@ -246,9 +246,12 @@
         <p class="warning">Your subscription is currently inactive. Ask superhost to reactivate access.</p>
         <% } %>
 
+        <h3>New EA</h3>
+        <p class="hint">Add a new Expert Advisor to licence</p>
+
         <form action="/mentor/robots" method="POST" class="stack-form">
           <label>
-            EA Name (Include Version)
+            EA NAME
             <input type="text" name="name" placeholder="ALGO NOVA EA v6" required />
           </label>
 
@@ -257,72 +260,21 @@
             <span>I confirm that I am an admin</span>
           </label>
 
-          <label>
-            Description
-            <textarea name="description" rows="3"></textarea>
-          </label>
+          <input type="hidden" name="description" value="" />
+          <input type="hidden" name="category" value="Expert Advisor" />
+          <input type="hidden" name="imageUrl" value="" />
+          <input type="hidden" name="allowedSymbols" value="<%= defaultSymbolsText %>" />
+          <input type="hidden" name="version" value="v1.0.0" />
+          <input type="hidden" name="status" value="active" />
+          <input type="hidden" name="uptimeHours" value="0" />
+          <input type="hidden" name="tasksCompleted" value="0" />
+          <input type="hidden" name="successRate" value="0" />
+          <input type="hidden" name="lastSync" value="Not provided" />
 
-          <label>
-            Category
-            <input type="text" name="category" placeholder="Trading bot, assistant, support" />
-          </label>
-
-          <label>
-            Robot Picture URL (Shown on client app)
-            <input type="url" name="imageUrl" placeholder="https://..." />
-          </label>
-
-          <label>
-            Symbols (comma or new line separated)
-            <textarea
-              name="allowedSymbols"
-              rows="2"
-              placeholder="XAUUSD, GBPUSD, .US30., BTCUSD"
-            ><%= defaultSymbolsText %></textarea>
-          </label>
-
-          <div class="row-fields">
-            <label>
-              Version
-              <input type="text" name="version" placeholder="v1.0.0" />
-            </label>
-
-            <label>
-              Status
-              <select name="status">
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-              </select>
-            </label>
+          <div class="cta-row">
+            <button type="submit" class="button">Add EA</button>
+            <a href="/mentor/dashboard?section=manage-eas#manage-eas" class="button secondary">Cancel</a>
           </div>
-
-          <h3>Key Stats</h3>
-          <div class="row-fields">
-            <label>
-              Uptime (hours)
-              <input type="number" step="1" name="uptimeHours" value="0" />
-            </label>
-
-            <label>
-              Tasks Completed
-              <input type="number" step="1" name="tasksCompleted" value="0" />
-            </label>
-          </div>
-
-          <div class="row-fields">
-            <label>
-              Success Rate (%)
-              <input type="number" step="0.01" name="successRate" value="0" />
-            </label>
-
-            <label>
-              Last Sync
-              <input type="text" name="lastSync" placeholder="2026-04-14T10:00:00Z" />
-            </label>
-          </div>
-
-          <button type="submit" class="button">Add EA</button>
         </form>
 
         <hr class="subtle-divider" />
@@ -392,6 +344,7 @@
         <hr class="subtle-divider" />
 
         <h3>Your Expert Advisors</h3>
+        <p class="hint">All EAs registered under your account</p>
 
         <% if (!robots.length) { %>
         <p class="hint">No robots created yet.</p>
@@ -400,61 +353,25 @@
           <table>
             <thead>
               <tr>
-                <th>Picture</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Version</th>
-                <th>Key Stats</th>
-                <th>Symbols</th>
-                <th>Mobile Build</th>
-                <th>Action</th>
+                <th>EA</th>
+                <th>USERS</th>
+                <th>ACTIVE</th>
+                <th>CREATED</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               <% robots.forEach((robot) => { %>
               <tr>
                 <td>
-                  <% if (robot.imageUrl) { %>
-                  <img src="<%= robot.imageUrl %>" alt="<%= robot.name %> image" class="robot-thumb" />
-                  <% } else { %>
-                  <span class="hint">No image</span>
-                  <% } %>
+                  <strong><%= robot.name %></strong>
                 </td>
-                <td><%= robot.name %></td>
-                <td><%= robot.category || '-' %></td>
-                <td><span class="pill"><%= robot.status %></span></td>
-                <td><%= robot.version %></td>
+                <td><%= robot.totalUsers || 0 %></td>
+                <td><%= robot.activeUsers || 0 %></td>
+                <td><%= robot.createdLabel || '-' %></td>
                 <td>
-                  Uptime: <%= robot.keyStats.uptimeHours %>h,
-                  Tasks: <%= robot.keyStats.tasksCompleted %>,
-                  Success: <%= robot.keyStats.successRate %>%
-                </td>
-                <td>
-                  <form action="/mentor/robots/<%= robot.id %>/symbols" method="POST" class="table-inline-form">
-                    <input
-                      type="text"
-                      name="allowedSymbols"
-                      value="<%= (robot.allowedSymbols || []).join(', ') %>"
-                      placeholder="XAUUSD, GBPUSD, .US30."
-                      class="table-inline-input"
-                    />
-                    <button type="submit" class="button mini">Save</button>
-                  </form>
-                  <p class="hint"><%= (robot.allowedSymbols || []).length %> symbols</p>
-                </td>
-                <td>
-                  <% if (robot.mobileBuild && robot.mobileBuild.status === 'ready') { %>
-                  <span class="pill ok">Ready (Android + iOS)</span>
-                  <% } else { %>
-                  <span class="pill off">Not converted</span>
-                  <% } %>
-                </td>
-                <td>
-                  <form action="/mentor/robots/<%= robot.id %>/convert-mobile" method="POST">
-                    <button type="submit" class="button mini">
-                      <%= robot.mobileBuild && robot.mobileBuild.status === 'ready' ? 'Rebuild Mobile' : 'Convert to Mobile' %>
-                    </button>
+                  <form action="/mentor/robots/<%= robot.id %>/test" method="POST" class="inline-form">
+                    <button type="submit" class="button mini secondary">Test</button>
                   </form>
                 </td>
               </tr>
