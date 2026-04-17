@@ -8,6 +8,7 @@ const {
   listUsers,
   getPortalTheme,
   updatePortalTheme,
+  getStorageStatus,
   getUserById,
   getUserByEmail,
   getMentorByPortalId,
@@ -40,6 +41,11 @@ const APP_NAME = 'Future EA Pro';
 const APP_SLUG = 'futureeapro';
 const SUPERHOST_EMAIL = normalizeEmail(process.env.SUPERHOST_EMAIL || 'superhost@futureeapro.com');
 const SUPERHOST_PASSWORD = process.env.SUPERHOST_PASSWORD || 'ChangeMe123!';
+const parsedUsdExchangeRate = Number(process.env.USD_EXCHANGE_RATE || 18.5);
+const USD_EXCHANGE_RATE =
+  Number.isFinite(parsedUsdExchangeRate) && parsedUsdExchangeRate > 0
+    ? parsedUsdExchangeRate
+    : 18.5;
 const CLIENT_BYPASS_PLAN = {
   code: 'bypass_free',
   label: 'Bypass Access',
@@ -759,6 +765,7 @@ app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
 
 app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res) => {
   const now = new Date();
+  const currentSection = normalizeMentorDashboardSection(req.query && req.query.section);
   const dashboard = buildOperatorDashboard(req.currentUser.id, now);
   if (!dashboard) {
     setFlash(req, 'error', 'Account not found.');
@@ -779,6 +786,7 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
     dashboardDateLabel: formatDashboardDate(now),
     forexEvents,
+    currentSection,
   });
 });
 
@@ -790,12 +798,12 @@ app.post('/mentor/business-settings', requireAuth, requireRole('mentor'), (req, 
 
   if (!Number.isFinite(robotPricePerKey) || robotPricePerKey < 0) {
     setFlash(req, 'error', 'Robot price must be a non-negative number.');
-    return res.redirect('/mentor/dashboard#track-business');
+    return res.redirect('/mentor/dashboard?section=track-business#track-business');
   }
 
   if (!Number.isInteger(monthlyKeyTarget) || monthlyKeyTarget < 0) {
     setFlash(req, 'error', 'Monthly key target must be a non-negative whole number.');
-    return res.redirect('/mentor/dashboard#track-business');
+    return res.redirect('/mentor/dashboard?section=track-business#track-business');
   }
 
   updateUser(req.currentUser.id, {
@@ -805,7 +813,7 @@ app.post('/mentor/business-settings', requireAuth, requireRole('mentor'), (req, 
   });
 
   setFlash(req, 'success', 'Business settings updated.');
-  return res.redirect('/mentor/dashboard#track-business');
+  return res.redirect('/mentor/dashboard?section=track-business#track-business');
 });
 
 app.post('/mentor/profile', requireAuth, requireRole('mentor'), (req, res) => {
@@ -819,7 +827,7 @@ app.post('/mentor/profile', requireAuth, requireRole('mentor'), (req, res) => {
   });
 
   setFlash(req, 'success', 'My profile updated for portal view.');
-  return res.redirect('/mentor/dashboard#my-profile');
+  return res.redirect('/mentor/dashboard?section=my-profile#my-profile');
 });
 
 app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
@@ -827,19 +835,19 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const name = String(body.name || '').trim();
   if (!name) {
     setFlash(req, 'error', 'EA name is required (include version).');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const confirmAdmin = String(body.confirmAdmin || '').trim().toLowerCase();
   if (confirmAdmin !== 'yes') {
     setFlash(req, 'error', 'Please confirm that you are an admin before adding a new EA.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const parseNumber = (value, fallback = 0) => {
@@ -866,20 +874,20 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   });
 
   setFlash(req, 'success', 'Robot profile created successfully.');
-  return res.redirect('/mentor/dashboard#manage-eas');
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
 app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), (req, res) => {
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const allowedSymbols = parseSymbolsInput(req.body && req.body.allowedSymbols);
   if (!allowedSymbols.length) {
     setFlash(req, 'error', 'Add at least one symbol for this robot.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   updateRobot(robot.id, {
@@ -887,7 +895,7 @@ app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), 
   });
 
   setFlash(req, 'success', `Allowed symbols updated for ${robot.name}.`);
-  return res.redirect('/mentor/dashboard#manage-eas');
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
 app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), async (req, res) => {
@@ -895,7 +903,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
@@ -907,22 +915,22 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
 
   if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
     setFlash(req, 'error', 'Client email is required and must be valid.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Choose a valid expert advisor (robot) first.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   if (!durationOption) {
     setFlash(req, 'error', 'Choose a valid key duration.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   if (totalGenerated >= mentor.licenseKeyLimit) {
     setFlash(req, 'error', 'License limit reached. Ask the superhost to increase your limit.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const createdAt = new Date();
@@ -939,7 +947,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
   });
   if (!createdKey) {
     setFlash(req, 'error', 'Could not generate a license key right now.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const emailResult = await sendLicenseKeyEmail({
@@ -969,20 +977,20 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
       `Key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
-  return res.redirect('/mentor/dashboard#manage-eas');
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
 app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('mentor'), (req, res) => {
   const mentor = getUserById(req.currentUser.id);
   if (!mentor.subscriptionActive) {
     setFlash(req, 'error', 'Subscription is inactive. Ask the superhost to reactivate your access.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   const robot = getRobotById(req.params.robotId);
   if (!robot || robot.mentorId !== req.currentUser.id) {
     setFlash(req, 'error', 'Robot not found.');
-    return res.redirect('/mentor/dashboard#manage-eas');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
   updateRobot(robot.id, {
@@ -994,15 +1002,19 @@ app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('men
   });
 
   setFlash(req, 'success', `${robot.name} converted for mobile delivery (Android + iOS).`);
-  return res.redirect('/mentor/dashboard#manage-eas');
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
-app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (_req, res) => {
+app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (req, res) => {
   const now = new Date();
-  const currentSection = normalizeSuperhostDashboardSection(_req.query && _req.query.section);
-  const superhostLab = buildOperatorDashboard(_req.currentUser.id, now);
+  const query = req.query || {};
+  const currentSection = normalizeSuperhostDashboardSection(query.section);
+  const mentorSearchQueryRaw = String(query.userSearch || '').trim();
+  const mentorSearchQuery = mentorSearchQueryRaw.toLowerCase();
+  const superhostLab = buildOperatorDashboard(req.currentUser.id, now);
   const forexEvents = await getUpcomingForexEvents(now);
-  const mentors = listMentors().map((mentor) => {
+
+  const mentorRows = listMentors().map((mentor) => {
     const robots = listRobotsByMentor(mentor.id);
     const keys = listLicenseKeysByMentor(mentor.id);
     const clientSubscriptions = listClientSubscriptionsByMentor(mentor.id);
@@ -1010,6 +1022,12 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (_r
     const activeSubscribers = clientSubscriptions.filter((item) =>
       isSubscriptionActiveNow(item, now)
     ).length;
+    const pendingEmailsCount = keys.filter(
+      (item) => item.reservedClientEmail && !item.emailSentAt
+    ).length;
+    const isPending = !mentor.approved;
+    const isBlocked = mentor.approved && !mentor.subscriptionActive;
+    const accountState = isPending ? 'pending' : isBlocked ? 'blocked' : 'active';
 
     return {
       ...mentor,
@@ -1017,14 +1035,149 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (_r
       activeKeysUsed,
       totalKeys: keys.length,
       activeSubscribers,
+      pendingEmailsCount,
+      licenseKeys: keys,
+      clientSubscriptions,
+      accountState,
     };
   });
 
+  const mentors = mentorSearchQuery
+    ? mentorRows.filter((mentor) =>
+        [
+          mentor.name,
+          mentor.email,
+          mentor.profilePhone,
+          String(mentor.mentorPortalId || ''),
+        ].some((value) => String(value || '').toLowerCase().includes(mentorSearchQuery))
+      )
+    : mentorRows;
+
+  const userMetrics = {
+    totalUsers: mentorRows.length,
+    activeUsers: mentorRows.filter((mentor) => mentor.accountState === 'active').length,
+    pendingUsers: mentorRows.filter((mentor) => mentor.accountState === 'pending').length,
+    blockedUsers: mentorRows.filter((mentor) => mentor.accountState === 'blocked').length,
+  };
+
+  const pendingEmails = mentorRows
+    .flatMap((mentor) =>
+      mentor.licenseKeys
+        .filter((item) => item.reservedClientEmail && !item.emailSentAt)
+        .map((item) => ({
+          id: item.id,
+          key: item.key,
+          clientEmail: item.reservedClientEmail,
+          robotName: item.robotName || 'Not set',
+          durationLabel: item.durationLabel || 'Not set',
+          mentorName: mentor.name,
+          mentorPortalId: mentor.mentorPortalId,
+          createdAt: item.createdAt,
+          createdLabel: formatDashboardDate(item.createdAt),
+        }))
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const recentUsers = [...mentorRows]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 10)
+    .map((mentor) => ({
+      ...mentor,
+      createdLabel: formatDashboardDate(mentor.createdAt),
+    }));
+
+  const paidSubscriptions = mentorRows
+    .flatMap((mentor) =>
+      mentor.clientSubscriptions.map((subscription) => ({
+        ...subscription,
+        mentorName: mentor.name,
+        mentorPortalId: mentor.mentorPortalId,
+      }))
+    )
+    .filter((subscription) => Number(subscription.amountZar) > 0)
+    .sort((a, b) => {
+      const aTime = new Date(a.startedAt || a.createdAt).getTime();
+      const bTime = new Date(b.startedAt || b.createdAt).getTime();
+      return bTime - aTime;
+    });
+
+  const totalRevenueZar = sumAmount(paidSubscriptions.map((subscription) => subscription.amountZar));
+  const monthlyRevenueZar = sumAmount(
+    paidSubscriptions
+      .filter((subscription) => isInSameMonth(subscription.startedAt || subscription.createdAt, now))
+      .map((subscription) => subscription.amountZar)
+  );
+
+  const packageBreakdownMap = new Map();
+  for (const subscription of paidSubscriptions) {
+    const plan = getClientPlan(subscription.planCode);
+    const amountZar = toCurrencyNumber(subscription.amountZar);
+    const planCode = plan ? plan.code : String(subscription.planCode || 'other');
+    const planLabel = plan ? plan.label : String(subscription.planCode || 'Unknown Plan');
+    if (!packageBreakdownMap.has(planCode)) {
+      packageBreakdownMap.set(planCode, {
+        planCode,
+        planLabel,
+        count: 0,
+        totalZar: 0,
+      });
+    }
+    const existing = packageBreakdownMap.get(planCode);
+    existing.count += 1;
+    existing.totalZar += amountZar;
+  }
+
+  const packageBreakdownRows = [...packageBreakdownMap.values()]
+    .map((item) => ({
+      ...item,
+      totalZar: toCurrencyNumber(item.totalZar),
+      totalUsd: convertZarToUsd(item.totalZar),
+    }))
+    .sort((a, b) => b.totalZar - a.totalZar);
+
+  const revenueRows = paidSubscriptions.slice(0, 40).map((subscription) => {
+    const plan = getClientPlan(subscription.planCode);
+    const amountZar = toCurrencyNumber(subscription.amountZar);
+    return {
+      id: subscription.id,
+      dateLabel: formatDashboardDate(subscription.startedAt || subscription.createdAt),
+      planLabel: plan ? plan.label : String(subscription.planCode || 'Unknown Plan'),
+      mentorName: subscription.mentorName,
+      mentorPortalId: subscription.mentorPortalId,
+      clientEmail: subscription.clientEmail,
+      amountZar,
+      amountUsd: convertZarToUsd(amountZar),
+      endsAtLabel: formatDashboardDate(subscription.endsAt),
+    };
+  });
+
+  const revenueMetrics = {
+    totalPaidSubscriptions: paidSubscriptions.length,
+    monthlyPaidSubscriptions: paidSubscriptions.filter((subscription) =>
+      isInSameMonth(subscription.startedAt || subscription.createdAt, now)
+    ).length,
+    totalRevenueZar: toCurrencyNumber(totalRevenueZar),
+    monthlyRevenueZar: toCurrencyNumber(monthlyRevenueZar),
+    totalRevenueUsd: convertZarToUsd(totalRevenueZar),
+    monthlyRevenueUsd: convertZarToUsd(monthlyRevenueZar),
+    exchangeRateUsdZar: USD_EXCHANGE_RATE,
+  };
+
   const platformTotals = {
-    totalMentors: mentors.length,
-    totalKeys: mentors.reduce((sum, mentor) => sum + Number(mentor.licenseKeyLimit || 0), 0),
-    totalGenerated: mentors.reduce((sum, mentor) => sum + Number(mentor.totalKeys || 0), 0),
-    activeSubscribers: mentors.reduce((sum, mentor) => sum + Number(mentor.activeSubscribers || 0), 0),
+    totalMentors: mentorRows.length,
+    totalKeys: mentorRows.reduce((sum, mentor) => sum + Number(mentor.licenseKeyLimit || 0), 0),
+    totalGenerated: mentorRows.reduce((sum, mentor) => sum + Number(mentor.totalKeys || 0), 0),
+    activeSubscribers: mentorRows.reduce((sum, mentor) => sum + Number(mentor.activeSubscribers || 0), 0),
+  };
+  const storageStatusRaw = getStorageStatus();
+  const storageStatus = {
+    dataFilePath: storageStatusRaw.dataFilePath,
+    dataDirPath: storageStatusRaw.dataDirPath,
+    exists: storageStatusRaw.exists,
+    sizeBytes: storageStatusRaw.sizeBytes,
+    sizeKb: toCurrencyNumber(Number(storageStatusRaw.sizeBytes || 0) / 1024),
+    lastUpdatedAt: storageStatusRaw.lastUpdatedAt,
+    lastUpdatedLabel: formatDashboardDateTime(storageStatusRaw.lastUpdatedAt),
   };
 
   res.render('superhost-dashboard', {
@@ -1032,6 +1185,14 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (_r
     mentors,
     superhostLab,
     platformTotals,
+    userMetrics,
+    recentUsers,
+    pendingEmails,
+    revenueMetrics,
+    revenueRows,
+    packageBreakdownRows,
+    mentorSearchQueryRaw,
+    storageStatus,
     defaultSymbolsText: QUOTE_SYMBOLS.join(', '),
     currentSection,
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
@@ -1349,6 +1510,68 @@ app.post('/superhost/mentors/:mentorId/license-limit', requireAuth, requireRole(
   return res.redirect('/superhost/dashboard?section=users#users');
 });
 
+app.post('/superhost/mentors/bulk-activate', requireAuth, requireRole('superhost'), (_req, res) => {
+  const mentors = listMentors();
+  let updatedCount = 0;
+  for (const mentor of mentors) {
+    const shouldUpdate = !mentor.approved || !mentor.subscriptionActive;
+    if (!shouldUpdate) {
+      continue;
+    }
+    updateUser(mentor.id, {
+      approved: true,
+      subscriptionActive: true,
+    });
+    updatedCount += 1;
+  }
+
+  setFlash(
+    _req,
+    'success',
+    `Bulk activate complete. ${updatedCount} mentor account${updatedCount === 1 ? '' : 's'} updated.`
+  );
+  return res.redirect('/superhost/dashboard?section=users#users');
+});
+
+app.get('/superhost/exports/mentor-emails.csv', requireAuth, requireRole('superhost'), (_req, res) => {
+  const mentors = listMentors();
+  const csvRows = [
+    [
+      'Name',
+      'Email',
+      'Mentor ID',
+      'Approved',
+      'Subscription Active',
+      'Phone',
+      'Created At',
+    ],
+  ];
+
+  for (const mentor of mentors) {
+    csvRows.push([
+      mentor.name || '',
+      mentor.email || '',
+      mentor.mentorPortalId || '',
+      mentor.approved ? 'Yes' : 'No',
+      mentor.subscriptionActive ? 'Yes' : 'No',
+      mentor.profilePhone || '',
+      mentor.createdAt || '',
+    ]);
+  }
+
+  const csvContent = csvRows
+    .map((row) => row.map(toCsvCell).join(','))
+    .join('\n');
+  const dateLabel = new Date().toISOString().slice(0, 10);
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="future-ea-pro-mentor-emails-${dateLabel}.csv"`
+  );
+  return res.send(csvContent);
+});
+
 app.use((_req, res) => {
   res.status(404).render('not-found', { title: 'Not Found' });
 });
@@ -1380,6 +1603,23 @@ function requireRole(role) {
   };
 }
 
+function normalizeMentorDashboardSection(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  const allowed = new Set([
+    'overview',
+    'my-profile',
+    'track-business',
+    'manage-eas',
+    'forex-events',
+  ]);
+
+  if (!allowed.has(normalized)) {
+    return 'overview';
+  }
+
+  return normalized;
+}
+
 function normalizeSuperhostDashboardSection(value) {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'client-keys' || normalized === 'create-robot') {
@@ -1388,6 +1628,8 @@ function normalizeSuperhostDashboardSection(value) {
   const allowed = new Set([
     'overview',
     'users',
+    'pending-emails',
+    'revenue',
     'my-profile',
     'track-business',
     'my-robots',
@@ -1529,6 +1771,22 @@ function formatDashboardDate(dateValue) {
   }).format(date);
 }
 
+function formatDashboardDateTime(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return 'Not available';
+  }
+  return new Intl.DateTimeFormat('en-ZA', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Johannesburg',
+  }).format(date);
+}
+
 function bootstrapSuperhost() {
   const users = listUsers();
   const existingByEmail = getUserByEmail(SUPERHOST_EMAIL);
@@ -1629,6 +1887,22 @@ function toCurrencyNumber(value) {
     return 0;
   }
   return Number(parsed.toFixed(2));
+}
+
+function convertZarToUsd(value) {
+  const amountZar = Number(value);
+  if (!Number.isFinite(amountZar) || amountZar <= 0) {
+    return 0;
+  }
+  return toCurrencyNumber(amountZar / USD_EXCHANGE_RATE);
+}
+
+function toCsvCell(value) {
+  const cell = String(value == null ? '' : value);
+  if (!/[",\n]/.test(cell)) {
+    return cell;
+  }
+  return `"${cell.replace(/"/g, '""')}"`;
 }
 
 function normalizeBusinessCurrency(value) {

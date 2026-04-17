@@ -1,33 +1,25 @@
 <%- include('partials/top', { title: title }) %>
+<% const activeSection = currentSection || 'overview'; %>
 
-<section class="dashboard-head dashboard-head-drawer">
-  <div>
-    <h1>Mentor Dashboard</h1>
-    <p>
-      Welcome, <strong><%= mentor.name %></strong>.
-      Your Mentor ID is <strong><%= mentor.mentorPortalId %></strong>.
-    </p>
-  </div>
+<section class="mentor-layout drawer-layout">
   <button
     type="button"
-    class="dashboard-drawer-toggle"
+    class="dashboard-drawer-toggle dashboard-drawer-toggle-fab"
     data-dashboard-drawer-toggle
     aria-expanded="false"
     aria-controls="mentor-dashboard-drawer"
     aria-label="Open sidebar menu"
   >
     <span aria-hidden="true">☰</span>
-    Menu
   </button>
-</section>
 
-<section class="mentor-layout drawer-layout">
   <button
     type="button"
     class="dashboard-drawer-backdrop"
     data-dashboard-drawer-backdrop
     aria-label="Close sidebar menu"
   ></button>
+
   <aside class="mentor-sidebar" id="mentor-dashboard-drawer" data-dashboard-drawer>
     <div class="sidebar-brand">
       <span class="sidebar-logo">F</span>
@@ -37,7 +29,7 @@
       </div>
     </div>
 
-    <a href="#my-profile" class="sidebar-profile">
+    <a href="/mentor/dashboard?section=my-profile#my-profile" class="sidebar-profile">
       <span class="sidebar-avatar"><%= (mentor.name || 'M').charAt(0).toUpperCase() %></span>
       <span>
         <strong><%= mentor.name %></strong>
@@ -48,7 +40,7 @@
 
     <div class="sidebar-group">
       <h2>Core</h2>
-      <a href="#overview" class="sidebar-link">
+      <a href="/mentor/dashboard?section=overview#overview" class="sidebar-link <%= activeSection === 'overview' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="3.5" y="3.5" width="7" height="7" rx="1.1"></rect>
@@ -59,7 +51,7 @@
         </span>
         Dashboard
       </a>
-      <a href="#track-business" class="sidebar-link">
+      <a href="/mentor/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M3.5 17.5L9 12l3.2 3.2L20.5 7"></path>
@@ -68,7 +60,7 @@
         </span>
         Track Business
       </a>
-      <a href="#manage-eas" class="sidebar-link">
+      <a href="/mentor/dashboard?section=manage-eas#manage-eas" class="sidebar-link <%= activeSection === 'manage-eas' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="4.5" y="7.5" width="15" height="11" rx="2.2"></rect>
@@ -80,7 +72,7 @@
         </span>
         Manage EAs
       </a>
-      <a href="#forex-events" class="sidebar-link">
+      <a href="/mentor/dashboard?section=forex-events#forex-events" class="sidebar-link <%= activeSection === 'forex-events' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 5.5h16"></path>
@@ -96,8 +88,8 @@
     </div>
 
     <div class="sidebar-group">
-      <h2>Management</h2>
-      <a href="#my-profile" class="sidebar-link">
+      <h2>Profile</h2>
+      <a href="/mentor/dashboard?section=my-profile#my-profile" class="sidebar-link <%= activeSection === 'my-profile' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="8" r="3.2"></circle>
@@ -107,10 +99,16 @@
         My Profile
       </a>
     </div>
+
+    <div class="sidebar-bottom-actions">
+      <form action="/logout" method="POST" class="inline-form">
+        <button type="submit" class="button secondary sidebar-logout-btn">Sign Out</button>
+      </form>
+    </div>
   </aside>
 
   <div class="mentor-main">
-    <section class="dashboard-overview" id="overview">
+    <section class="dashboard-overview <%= activeSection === 'overview' ? '' : 'section-hidden' %>" id="overview">
       <div class="overview-top-row">
         <p class="status-pill ok"><span>●</span>All systems running smoothly</p>
         <p class="status-pill"><span>📅</span>Today — <%= dashboardDateLabel %></p>
@@ -119,91 +117,40 @@
       <article class="panel welcome-banner">
         <div class="welcome-icon" aria-hidden="true">🛡️</div>
         <div>
-          <h2>Welcome back!</h2>
-          <p class="welcome-sub">You have <strong><%= dashboardTotals.activeSubscribers %> active licenses</strong> running on your account.</p>
+          <h2>Welcome back</h2>
+          <p class="welcome-sub">You have <strong><%= dashboardTotals.activeSubscribers %> active subscribers</strong> running on your account.</p>
           <p class="mentor-id-pill">Mentor ID: <strong><%= mentor.mentorPortalId %></strong></p>
         </div>
       </article>
 
       <div class="kpi-grid">
         <article class="kpi-card red">
-          <h3>Total Licenses</h3>
-          <p class="kpi-value"><%= dashboardTotals.totalGenerated %></p>
-          <p>All time generated keys</p>
+          <h3>Total Keys</h3>
+          <p class="kpi-value"><%= mentor.licenseKeyLimit %></p>
+          <p>Your current key allowance</p>
         </article>
         <article class="kpi-card green">
-          <h3>Active Subscriptions</h3>
-          <p class="kpi-value"><%= dashboardTotals.activeSubscribers %></p>
-          <p>Currently active users</p>
+          <h3>Generated Keys</h3>
+          <p class="kpi-value"><%= dashboardTotals.totalGenerated %></p>
+          <p>All time generated</p>
         </article>
         <article class="kpi-card blue">
-          <h3>Total EAs</h3>
-          <p class="kpi-value"><%= robots.length %></p>
-          <p>Expert Advisors registered</p>
+          <h3>Active Subscribers</h3>
+          <p class="kpi-value"><%= dashboardTotals.activeSubscribers %></p>
+          <p>Paid and currently active</p>
         </article>
         <article class="kpi-card orange">
-          <h3>Maximum Licenses</h3>
-          <p class="kpi-value"><%= mentor.licenseKeyLimit %></p>
-          <p>Current key cap</p>
+          <h3>Total EAs</h3>
+          <p class="kpi-value"><%= robots.length %></p>
+          <p>Robots registered</p>
         </article>
       </div>
     </section>
 
-    <section class="panel-grid single" id="my-profile">
-      <article class="panel">
-        <h2>My Profile (Portal Only)</h2>
-        <p class="hint">
-          These details are only shown inside the mentor portal and superhost portal, not on the client app.
-        </p>
-
-        <form action="/mentor/profile" method="POST" class="stack-form">
-          <div class="row-fields">
-            <label>
-              Display Name
-              <input type="text" name="name" value="<%= mentor.name %>" required />
-            </label>
-
-            <label>
-              Profile Headline
-              <input type="text" name="profileHeadline" value="<%= mentor.profileHeadline || '' %>" placeholder="Lead Robotics Mentor" />
-            </label>
-          </div>
-
-          <label>
-            Bio
-            <textarea name="profileBio" rows="3" placeholder="Short mentor background"><%= mentor.profileBio || '' %></textarea>
-          </label>
-
-          <div class="row-fields">
-            <label>
-              Phone
-              <input type="text" name="profilePhone" value="<%= mentor.profilePhone || '' %>" />
-            </label>
-
-            <label>
-              Profile Image URL
-              <input type="url" name="profileImageUrl" value="<%= mentor.profileImageUrl || '' %>" placeholder="https://..." />
-            </label>
-          </div>
-
-          <button type="submit" class="button">Save My Profile</button>
-        </form>
-
-        <% if (mentor.profileImageUrl) { %>
-        <div class="profile-preview">
-          <img src="<%= mentor.profileImageUrl %>" alt="Mentor profile image" class="robot-thumb" />
-          <p class="hint">Portal preview only.</p>
-        </div>
-        <% } %>
-      </article>
-    </section>
-
-    <section class="panel-grid single" id="track-business">
+    <section class="panel-grid single <%= activeSection === 'track-business' ? '' : 'section-hidden' %>" id="track-business">
       <article class="panel">
         <h2>Track My Business</h2>
-        <p class="hint">
-          Set your robot price and monthly key target, then track sales and income in real time.
-        </p>
+        <p class="hint">Set your price and monthly target, then monitor revenue progress.</p>
 
         <form action="/mentor/business-settings" method="POST" class="stack-form">
           <div class="row-fields">
@@ -290,26 +237,13 @@
       </article>
     </section>
 
-    <section class="panel-grid single">
-      <article class="panel">
-        <h2>Account Status</h2>
-        <p><strong>Mentor ID:</strong> <%= mentor.mentorPortalId %></p>
-        <p><strong>Email:</strong> <%= mentor.email %></p>
-        <p><strong>Approved:</strong> <%= mentor.approved ? 'Yes' : 'No' %></p>
-        <p><strong>Subscription Active:</strong> <%= mentor.subscriptionActive ? 'Yes' : 'No' %></p>
-        <p><strong>License Keys Used:</strong> <%= activeKeysUsed %> / <%= mentor.licenseKeyLimit %></p>
-      </article>
-    </section>
-
-    <section class="panel-grid single" id="manage-eas">
+    <section class="panel-grid single <%= activeSection === 'manage-eas' ? '' : 'section-hidden' %>" id="manage-eas">
       <article class="panel">
         <h2>Manage EAs</h2>
-        <p class="hint">Add a new Expert Advisor first, confirm admin access, then continue with full EA details.</p>
+        <p class="hint">Create new robots and generate client license keys from this section.</p>
 
         <% if (!mentor.subscriptionActive) { %>
-        <p class="warning">
-          Your subscription is currently inactive. Ask superhost to reactivate/bypass subscription.
-        </p>
+        <p class="warning">Your subscription is currently inactive. Ask superhost to reactivate access.</p>
         <% } %>
 
         <form action="/mentor/robots" method="POST" class="stack-form">
@@ -393,10 +327,9 @@
 
         <hr class="subtle-divider" />
 
-        <h3>Manage Keys</h3>
-        <p class="hint">
-          Issue a key by client email, EA, and duration. The key is emailed automatically and can also be copied here.
-        </p>
+        <h3>Generate License Key</h3>
+        <p class="hint">Keys are generated, reserved to the client email, and emailed automatically.</p>
+
         <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
           <label>
             Client Email
@@ -455,12 +388,10 @@
           <% }) %>
         </ul>
         <% } %>
-      </article>
-    </section>
 
-    <section class="panel-grid single" id="my-robots">
-      <article class="panel">
-        <h2>Your Expert Advisors</h2>
+        <hr class="subtle-divider" />
+
+        <h3>Your Expert Advisors</h3>
 
         <% if (!robots.length) { %>
         <p class="hint">No robots created yet.</p>
@@ -535,7 +466,7 @@
       </article>
     </section>
 
-    <section class="panel-grid single" id="forex-events">
+    <section class="panel-grid single <%= activeSection === 'forex-events' ? '' : 'section-hidden' %>" id="forex-events">
       <article class="panel">
         <h2>Forex Events</h2>
         <p class="hint">Showing upcoming events from <strong><%= forexEvents.fromLabel %></strong> to <strong><%= forexEvents.toLabel %></strong>. Past history is excluded automatically.</p>
@@ -556,6 +487,53 @@
             </div>
           </article>
           <% }) %>
+        </div>
+        <% } %>
+      </article>
+    </section>
+
+    <section class="panel-grid single <%= activeSection === 'my-profile' ? '' : 'section-hidden' %>" id="my-profile">
+      <article class="panel">
+        <h2>My Profile (Portal Only)</h2>
+        <p class="hint">These details are shown on the portal and never in the client app.</p>
+
+        <form action="/mentor/profile" method="POST" class="stack-form">
+          <div class="row-fields">
+            <label>
+              Display Name
+              <input type="text" name="name" value="<%= mentor.name %>" required />
+            </label>
+
+            <label>
+              Profile Headline
+              <input type="text" name="profileHeadline" value="<%= mentor.profileHeadline || '' %>" placeholder="Lead Robotics Mentor" />
+            </label>
+          </div>
+
+          <label>
+            Bio
+            <textarea name="profileBio" rows="3" placeholder="Short mentor background"><%= mentor.profileBio || '' %></textarea>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Phone
+              <input type="text" name="profilePhone" value="<%= mentor.profilePhone || '' %>" />
+            </label>
+
+            <label>
+              Profile Image URL
+              <input type="url" name="profileImageUrl" value="<%= mentor.profileImageUrl || '' %>" placeholder="https://..." />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Save My Profile</button>
+        </form>
+
+        <% if (mentor.profileImageUrl) { %>
+        <div class="profile-preview">
+          <img src="<%= mentor.profileImageUrl %>" alt="Mentor profile image" class="robot-thumb" />
+          <p class="hint">Portal preview only.</p>
         </div>
         <% } %>
       </article>

@@ -26,7 +26,7 @@ MVP hosting platform for mentor robots with:
 - Node.js
 - Express + EJS
 - Session auth
-- Local JSON database (`src/data/db.json`)
+- JSON database (default: `src/data/db.json`, configurable via `DATA_DIR`/`DATA_FILE`)
 
 ## Run
 1. Install dependencies:
@@ -44,6 +44,21 @@ MVP hosting platform for mentor robots with:
 4. Open:
    - `http://localhost:3000`
    - Android entry link: `http://localhost:3000/download/android`
+
+## Persistence (Do This To Avoid Data Reset)
+Mentor accounts, robots, license keys, subscriptions, and theme settings are all stored in `db.json`.
+
+Use one of these:
+- `DATA_DIR=/path/to/folder` (app will use `/path/to/folder/db.json`)
+- `DATA_FILE=/path/to/folder/custom-name.json` (overrides `DATA_DIR`)
+
+For Render production:
+1. Add a **Persistent Disk** in your service.
+2. Use mount path like `/var/data`.
+3. Set env var `DATA_DIR=/var/data/futureeapro`.
+4. Save and redeploy.
+
+After this, restarts/redeploys keep all mentor and robot data.
 
 ## Auto-create Render Web Service
 You can create the Render web service from your repo automatically via API:
@@ -63,7 +78,7 @@ Optional environment variables:
 - `RENDER_REGION` (default: `oregon`)
 - `RENDER_BUILD_COMMAND` (default: `npm install`)
 - `RENDER_START_COMMAND` (default: `npm start`)
-- `SESSION_SECRET`, `SUPERHOST_EMAIL`, `SUPERHOST_PASSWORD`, `CLIENT_BYPASS_EMAILS`
+- `SESSION_SECRET`, `SUPERHOST_EMAIL`, `SUPERHOST_PASSWORD`, `CLIENT_BYPASS_EMAILS`, `USD_EXCHANGE_RATE`, `DATA_DIR`, `DATA_FILE`
 
 ## Full Auto Bootstrap (GitHub + Render)
 Create GitHub repo, push this project, create Render web service, and attach domains:

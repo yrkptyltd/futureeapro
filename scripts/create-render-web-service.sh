@@ -87,6 +87,8 @@ main() {
   local superhost_email="${SUPERHOST_EMAIL:-superhost@futureeapro.com}"
   local superhost_password="${SUPERHOST_PASSWORD:-ChangeMe123!}"
   local client_bypass_emails="${CLIENT_BYPASS_EMAILS:-nhlanhlamashapa11@gmail,nhlanhlamashapa11@gmail.com}"
+  local usd_exchange_rate="${USD_EXCHANGE_RATE:-18.5}"
+  local data_dir="${DATA_DIR:-}"
 
   local owner_id
   owner_id="$(pick_owner_id)"
@@ -123,6 +125,8 @@ main() {
         --arg superhostEmail "$superhost_email" \
         --arg superhostPassword "$superhost_password" \
         --arg clientBypassEmails "$client_bypass_emails" \
+        --arg usdExchangeRate "$usd_exchange_rate" \
+        --arg dataDir "$data_dir" \
         '
           {
             type: $type,
@@ -135,7 +139,8 @@ main() {
               { key: "SESSION_SECRET", value: $sessionSecret },
               { key: "SUPERHOST_EMAIL", value: $superhostEmail },
               { key: "SUPERHOST_PASSWORD", value: $superhostPassword },
-              { key: "CLIENT_BYPASS_EMAILS", value: $clientBypassEmails }
+              { key: "CLIENT_BYPASS_EMAILS", value: $clientBypassEmails },
+              { key: "USD_EXCHANGE_RATE", value: $usdExchangeRate }
             ],
             serviceDetails: {
               runtime: $runtime,
@@ -148,6 +153,7 @@ main() {
               }
             }
           }
+          | if $dataDir == "" then . else .envVars += [{ key: "DATA_DIR", value: $dataDir }] end
           | if $rootDir == "" then del(.rootDir) else .rootDir = $rootDir end
         '
     })"

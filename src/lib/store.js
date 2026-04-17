@@ -2,8 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DATA_FILE = path.join(DATA_DIR, 'db.json');
+const DEFAULT_DATA_DIR = path.join(__dirname, '..', 'data');
+const configuredDataDir = String(process.env.DATA_DIR || '').trim();
+const configuredDataFile = String(process.env.DATA_FILE || '').trim();
+const DATA_FILE = configuredDataFile
+  ? path.resolve(configuredDataFile)
+  : path.join(path.resolve(configuredDataDir || DEFAULT_DATA_DIR), 'db.json');
+const DATA_DIR = path.dirname(DATA_FILE);
 const DEFAULT_THEME = {
   primary: '#ff5f6d',
   secondary: '#ff9f43',
@@ -37,7 +42,12 @@ function ensureDataFile() {
 function readData() {
   ensureDataFile();
   const raw = fs.readFileSync(DATA_FILE, 'utf8');
-  const parsed = JSON.parse(raw || '{}');
+  let parsed = {};
+  try {
+    parsed = JSON.parse(raw || '{}');
+  } catch (_error) {
+    parsed = {};
+  }
   return {
     users: parsed.users || [],
     robots: parsed.robots || [],
@@ -57,6 +67,28 @@ function writeData(data) {
   const tmpFile = `${DATA_FILE}.tmp`;
   fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2));
   fs.renameSync(tmpFile, DATA_FILE);
+}
+
+function getStorageStatus() {
+  ensureDataFile();
+  const info = {
+    dataFilePath: DATA_FILE,
+    dataDirPath: DATA_DIR,
+    exists: false,
+    sizeBytes: 0,
+    lastUpdatedAt: null,
+  };
+
+  try {
+    const stats = fs.statSync(DATA_FILE);
+    info.exists = true;
+    info.sizeBytes = Number(stats.size || 0);
+    info.lastUpdatedAt = stats.mtime ? stats.mtime.toISOString() : null;
+  } catch (_error) {
+    // Keep defaults.
+  }
+
+  return info;
 }
 
 function createId(prefix) {
@@ -405,6 +437,7 @@ module.exports = {
   ensureMentorPortalIds,
   getPortalTheme,
   updatePortalTheme,
+  getStorageStatus,
   listUsers,
   getUserById,
   getUserByEmail,

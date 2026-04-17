@@ -2,47 +2,24 @@
 
 <section class="dashboard-overview">
   <div class="overview-top-row">
-    <p class="status-pill ok"><span>●</span>All systems running smoothly</p>
+    <p class="status-pill ok"><span>●</span>Platform online and stable</p>
     <p class="status-pill"><span>📅</span>Today — <%= dashboardDateLabel %></p>
   </div>
 
   <article class="panel welcome-banner">
     <div class="welcome-icon" aria-hidden="true">⚡</div>
     <div>
-      <h2>Future EA Pro Portal</h2>
-      <p class="welcome-sub">Host mentor robots, manage EA keys, and deliver Android + iOS access from one platform.</p>
-      <p class="mentor-id-pill"><strong>24/7 Live</strong> • Secure EA Delivery</p>
+      <h2>Future EA Pro</h2>
+      <p class="welcome-sub">A professional mobile EA hosting platform for mentors and their clients on Android + iOS.</p>
+      <p class="mentor-id-pill"><strong>24/7 Infrastructure</strong> • MT4 / MT5 Compatible</p>
     </div>
   </article>
-
-  <div class="kpi-grid">
-    <article class="kpi-card red">
-      <h3>1 Month</h3>
-      <p class="kpi-value">R599</p>
-      <p>Starter subscription</p>
-    </article>
-    <article class="kpi-card green">
-      <h3>3 Months</h3>
-      <p class="kpi-value">R1499</p>
-      <p>Best-value quarterly plan</p>
-    </article>
-    <article class="kpi-card blue">
-      <h3>1 Year</h3>
-      <p class="kpi-value">R4599</p>
-      <p>Full annual access</p>
-    </article>
-    <article class="kpi-card orange">
-      <h3>Platforms</h3>
-      <p class="kpi-value">2</p>
-      <p>Android + iOS delivery</p>
-    </article>
-  </div>
 </section>
 
 <section class="panel-grid home-split">
   <article class="panel quick-card">
-    <h2>Mentor Access</h2>
-    <p>Create or sign in to your mentor account, then manage EAs, client keys, and subscriber activity.</p>
+    <h2>Mentor Portal</h2>
+    <p>Create your mentor account, add EAs, manage license keys, and monitor active subscribers from a clean dashboard.</p>
     <div class="cta-row">
       <a class="button" href="/signup">Mentor Sign Up</a>
       <a class="button secondary" href="/signin">Mentor Sign In</a>
@@ -50,19 +27,19 @@
   </article>
 
   <article class="panel quick-card">
-    <h2>Client Downloads</h2>
-    <p>Install the client app and unlock robot access with mentor-issued keys.</p>
+    <h2>Client App Access</h2>
+    <p>Clients enter Mentor ID + email, choose a plan, then unlock the robot app with mentor-issued license keys.</p>
     <div class="cta-row">
       <a class="button" href="/download/android">Download Android</a>
-      <a class="button secondary" href="/client">Download iOS</a>
+      <a class="button secondary" href="/client">Open iOS Guide</a>
       <a class="button ghost" href="/signin">Reactivate Account</a>
     </div>
     <details class="install-guide">
       <summary>How to Install iOS</summary>
       <ol>
-        <li>Tap <strong>Download iOS</strong> and open in Safari.</li>
+        <li>Tap <strong>Open iOS Guide</strong> and open in Safari.</li>
         <li>Tap Share, then choose <strong>Add to Home Screen</strong>.</li>
-        <li>Launch the app icon from your home screen.</li>
+        <li>Launch the icon from your home screen.</li>
       </ol>
     </details>
   </article>
@@ -70,24 +47,65 @@
 
 <section class="clean-grid">
   <article class="panel quick-card">
-    <h2>Low Latency</h2>
-    <p>Run robot automation with responsive execution built for active trading.</p>
+    <h2>Low Latency Routing</h2>
+    <p>Fast execution paths designed for active sessions and stable robot operation.</p>
   </article>
 
   <article class="panel quick-card">
-    <h2>Secure Hosting</h2>
-    <p>Mentor and client sessions are controlled with managed key activation flows.</p>
+    <h2>Secure License Flow</h2>
+    <p>License keys are tied to client email and managed through role-based portal controls.</p>
   </article>
 
-  <article class="panel quick-card pricing-card">
-    <h2>Broker Compatibility</h2>
+  <article class="panel quick-card">
+    <h2>Broker Coverage</h2>
     <ul class="list">
-      <li>MT4 / MT5 supported</li>
-      <li>Razor Markets supported</li>
+      <li>MT4 and MT5 support</li>
+      <li>Razor Markets support</li>
       <li>Custom broker server support</li>
     </ul>
-    <a class="button" href="/client">Open Client Portal</a>
   </article>
+</section>
+
+<section class="pricing-showcase">
+  <article class="panel pricing-showcase-head">
+    <h2>Mobile VPS Pricing</h2>
+    <p>Simple plans built for reliable monthly, quarterly, and annual robot hosting.</p>
+  </article>
+
+  <div class="vps-pricing-grid">
+    <article class="vps-price-card neon-crimson">
+      <p class="price-label">1 Month</p>
+      <p class="price-value">R599</p>
+      <p class="price-copy">Best for short-term onboarding and quick testing cycles.</p>
+      <ul class="list price-points">
+        <li>Single monthly billing</li>
+        <li>Mentor key activation flow</li>
+        <li>Android + iOS client unlock</li>
+      </ul>
+    </article>
+
+    <article class="vps-price-card neon-pink">
+      <p class="price-label">3 Months</p>
+      <p class="price-value">R1499</p>
+      <p class="price-copy">Popular plan for steady usage and lower quarterly cost.</p>
+      <ul class="list price-points">
+        <li>Quarterly access window</li>
+        <li>Mentor dashboard tracking</li>
+        <li>Professional key lifecycle</li>
+      </ul>
+    </article>
+
+    <article class="vps-price-card neon-gold">
+      <p class="price-label">1 Year</p>
+      <p class="price-value">R4599</p>
+      <p class="price-copy">Long-term plan for full-year stability and lowest effective cost.</p>
+      <ul class="list price-points">
+        <li>Annual uninterrupted hosting</li>
+        <li>Priority long-run continuity</li>
+        <li>Supports scale across mentors</li>
+      </ul>
+    </article>
+  </div>
 </section>
 
 <%- include('partials/bottom') %>

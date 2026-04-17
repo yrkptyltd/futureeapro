@@ -18,9 +18,10 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <% const isRobotInterfacePath = String(currentPath || '').startsWith('/client/robot/'); %>
-  <body class="<%= isRobotInterfacePath ? 'client-robot-page' : '' %>">
+  <% const isDashboardPath = String(currentPath || '').startsWith('/mentor/dashboard') || String(currentPath || '').startsWith('/superhost/dashboard') || String(currentPath || '').startsWith('/superhost/mentors/'); %>
+  <body class="<%= [isRobotInterfacePath ? 'client-robot-page' : '', isDashboardPath ? 'portal-dashboard-page' : ''].filter(Boolean).join(' ') %>">
     <% const isClientPath = String(currentPath || '').startsWith('/client'); %>
-    <% if (!isRobotInterfacePath) { %>
+    <% if (!isRobotInterfacePath && !isDashboardPath) { %>
     <header class="site-header">
       <div class="brand">
         <a href="/" class="brand-link"><%= appName %></a>

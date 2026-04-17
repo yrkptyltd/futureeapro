@@ -2,40 +2,38 @@
 
 <% const lab = superhostLab || {}; %>
 <% const labAccount = lab.account || currentUser; %>
-<% const labTotals = lab.dashboardTotals || { totalKeys: 0, totalGenerated: 0, activeSubscribers: 0 }; %>
 <% const labBusiness = lab.businessMetrics || { businessCurrency: 'ZAR', currencySymbol: 'R', robotPricePerKey: 0, monthlyKeyTarget: 0, keysSoldThisMonth: 0, monthlyRevenue: 0, estimatedTotalRevenue: 0, projectedRevenueByMentorPrice: 0, goalRevenueAtTarget: 0, targetRemaining: 0, targetProgressPercent: 0, targetReached: false, monthLabel: 'This Month' }; %>
 <% const labRobots = lab.robots || []; %>
 <% const labLicenseKeys = lab.licenseKeys || []; %>
 <% const labActiveKeysUsed = lab.activeKeysUsed || 0; %>
 <% const activeSection = currentSection || 'overview'; %>
+<% const metrics = userMetrics || { totalUsers: 0, activeUsers: 0, pendingUsers: 0, blockedUsers: 0 }; %>
+<% const recentUsersList = recentUsers || []; %>
+<% const pendingEmailItems = pendingEmails || []; %>
+<% const revenue = revenueMetrics || { totalPaidSubscriptions: 0, monthlyPaidSubscriptions: 0, totalRevenueUsd: 0, monthlyRevenueUsd: 0, exchangeRateUsdZar: 0 }; %>
+<% const payments = revenueRows || []; %>
+<% const packageRows = packageBreakdownRows || []; %>
+<% const storage = storageStatus || { dataFilePath: '-', dataDirPath: '-', exists: false, sizeKb: 0, lastUpdatedLabel: 'Not available' }; %>
 
-<section class="dashboard-head dashboard-head-drawer">
-  <div>
-    <h1>Superhost Dashboard</h1>
-    <p>
-      Signed in as <strong><%= currentUser.email %></strong>. Superhost controls stay available, and this dashboard now includes a mentor-style test lab.
-    </p>
-  </div>
+<section class="mentor-layout drawer-layout">
   <button
     type="button"
-    class="dashboard-drawer-toggle"
+    class="dashboard-drawer-toggle dashboard-drawer-toggle-fab"
     data-dashboard-drawer-toggle
     aria-expanded="false"
     aria-controls="superhost-dashboard-drawer"
     aria-label="Open sidebar menu"
   >
     <span aria-hidden="true">☰</span>
-    Menu
   </button>
-</section>
 
-<section class="mentor-layout drawer-layout">
   <button
     type="button"
     class="dashboard-drawer-backdrop"
     data-dashboard-drawer-backdrop
     aria-label="Close sidebar menu"
   ></button>
+
   <aside class="mentor-sidebar" id="superhost-dashboard-drawer" data-dashboard-drawer>
     <div class="sidebar-brand">
       <span class="sidebar-logo">F</span>
@@ -55,7 +53,7 @@
     </a>
 
     <div class="sidebar-group">
-      <h2>Core</h2>
+      <h2>Overview</h2>
       <a href="/superhost/dashboard?section=overview#overview" class="sidebar-link <%= activeSection === 'overview' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -76,16 +74,39 @@
             <path d="M14 19c.8-1.8 2.1-2.8 4-2.8 1 0 1.8.2 2.5.6"></path>
           </svg>
         </span>
-        Users
+        Manage Users
+        <span class="sidebar-link-count"><%= metrics.totalUsers %></span>
       </a>
-      <a href="/superhost/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>">
+      <a href="/superhost/dashboard?section=pending-emails#pending-emails" class="sidebar-link <%= activeSection === 'pending-emails' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
-            <path d="M3.5 17.5L9 12l3.2 3.2L20.5 7"></path>
-            <path d="M14.5 7h6v6"></path>
+            <rect x="3.5" y="5" width="17" height="14" rx="2"></rect>
+            <path d="M3.8 6.5l8.2 6.5 8.2-6.5"></path>
           </svg>
         </span>
-        Track Business
+        Pending Emails
+        <span class="sidebar-link-count"><%= pendingEmailItems.length %></span>
+      </a>
+      <a href="/superhost/dashboard?section=users#users" class="sidebar-link">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M7 10.5V7.8A5 5 0 0 1 12 3a5 5 0 0 1 5 4.8v2.7"></path>
+            <rect x="5" y="10.5" width="14" height="10" rx="2"></rect>
+            <circle cx="12" cy="15.5" r="1.2"></circle>
+          </svg>
+        </span>
+        Reset Requests
+        <span class="sidebar-link-count">0</span>
+      </a>
+      <a href="/superhost/dashboard?section=revenue#revenue" class="sidebar-link <%= activeSection === 'revenue' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 18.5h14"></path>
+            <path d="M8 14.5l2.5-2.5 2.2 2.2L16.5 9"></path>
+            <path d="M14.6 9h1.9v1.9"></path>
+          </svg>
+        </span>
+        Revenue
       </a>
       <a href="/superhost/dashboard?section=forex-events#forex-events" class="sidebar-link <%= activeSection === 'forex-events' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
@@ -116,6 +137,15 @@
         </span>
         Manage EAs
       </a>
+      <a href="/superhost/dashboard?section=track-business#track-business" class="sidebar-link <%= activeSection === 'track-business' ? 'active' : '' %>">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3.5 17.5L9 12l3.2 3.2L20.5 7"></path>
+            <path d="M14.5 7h6v6"></path>
+          </svg>
+        </span>
+        Track Business
+      </a>
       <a href="/superhost/dashboard?section=portal-theme#portal-theme" class="sidebar-link <%= activeSection === 'portal-theme' ? 'active' : '' %>">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -137,6 +167,20 @@
         My Profile
       </a>
     </div>
+
+    <div class="sidebar-group sidebar-group-compact">
+      <h2>Tools</h2>
+      <form action="/superhost/mentors/bulk-activate" method="POST" class="inline-form sidebar-tool-form">
+        <button type="submit" class="button mini secondary sidebar-tool-btn">Bulk Activate</button>
+      </form>
+      <a href="/superhost/exports/mentor-emails.csv" class="sidebar-link sidebar-link-plain">Export Emails (CSV)</a>
+    </div>
+
+    <div class="sidebar-bottom-actions">
+      <form action="/logout" method="POST" class="inline-form">
+        <button type="submit" class="button secondary sidebar-logout-btn">Sign Out</button>
+      </form>
+    </div>
   </aside>
 
   <div class="mentor-main">
@@ -149,43 +193,129 @@
       <article class="panel welcome-banner">
         <div class="welcome-icon" aria-hidden="true">🛡️</div>
         <div>
-          <h2>Welcome back!</h2>
-          <p class="welcome-sub">You are monitoring <strong><%= platformTotals.activeSubscribers %> active subscriptions</strong> across the portal.</p>
+          <h2>Dashboard Overview</h2>
+          <p class="welcome-sub">Welcome back. Monitor users, pending emails, and paid subscriptions in one clean control center.</p>
           <p class="mentor-id-pill">Superhost: <strong><%= currentUser.email %></strong></p>
         </div>
       </article>
 
-      <div class="kpi-grid">
-        <article class="kpi-card red">
-          <h3>Total Licenses</h3>
-          <p class="kpi-value"><%= platformTotals.totalGenerated %></p>
-          <p>All generated keys</p>
+      <article class="panel dashboard-search-panel">
+        <form action="/superhost/dashboard" method="GET" class="dashboard-search-form">
+          <input type="hidden" name="section" value="users" />
+          <input
+            type="search"
+            name="userSearch"
+            value="<%= mentorSearchQueryRaw || '' %>"
+            placeholder="Quick search users by name, email, phone or Mentor ID"
+          />
+          <button type="submit" class="button mini">Search</button>
+        </form>
+      </article>
+
+      <div class="user-status-grid">
+        <article class="status-card status-total">
+          <h3>Total Users</h3>
+          <p class="status-value"><%= metrics.totalUsers %></p>
+          <p class="hint">All mentor accounts</p>
         </article>
-        <article class="kpi-card green">
-          <h3>Active Subscriptions</h3>
-          <p class="kpi-value"><%= platformTotals.activeSubscribers %></p>
-          <p>Live paid clients</p>
+        <article class="status-card status-active">
+          <h3>Active Users</h3>
+          <p class="status-value"><%= metrics.activeUsers %></p>
+          <p class="hint">Approved + active subscription</p>
         </article>
-        <article class="kpi-card blue">
-          <h3>Total Mentors</h3>
-          <p class="kpi-value"><%= platformTotals.totalMentors %></p>
-          <p>Mentors on portal</p>
+        <article class="status-card status-pending">
+          <h3>Pending Users</h3>
+          <p class="status-value"><%= metrics.pendingUsers %></p>
+          <p class="hint">Awaiting approval</p>
         </article>
-        <article class="kpi-card orange">
-          <h3>Maximum Licenses</h3>
-          <p class="kpi-value"><%= platformTotals.totalKeys %></p>
-          <p>Combined mentor key limits</p>
+        <article class="status-card status-blocked">
+          <h3>Blocked Users</h3>
+          <p class="status-value"><%= metrics.blockedUsers %></p>
+          <p class="hint">Subscription inactive</p>
+        </article>
+      </div>
+
+      <div class="superhost-overview-grid">
+        <article class="panel">
+          <div class="panel-head-row">
+            <h2>Recent Users</h2>
+            <a class="text-link" href="/superhost/dashboard?section=users#users">View All</a>
+          </div>
+          <% if (!recentUsersList.length) { %>
+          <p class="hint">No recent users found.</p>
+          <% } else { %>
+          <ul class="recent-users-list">
+            <% recentUsersList.forEach((user) => { %>
+            <li>
+              <span class="recent-user-avatar"><%= (user.name || 'U').charAt(0).toUpperCase() %></span>
+              <div>
+                <p class="recent-user-name"><%= user.name %></p>
+                <p class="hint"><%= user.email %> • <%= user.createdLabel %></p>
+              </div>
+              <span class="pill <%= user.accountState === 'active' ? 'ok' : 'off' %>">
+                <%= user.accountState === 'active' ? 'Active' : user.accountState === 'pending' ? 'Pending' : 'Blocked' %>
+              </span>
+            </li>
+            <% }) %>
+          </ul>
+          <% } %>
+        </article>
+
+        <article class="panel">
+          <h2>Quick Actions</h2>
+          <div class="quick-actions-grid">
+            <a class="button secondary" href="/superhost/dashboard?section=users#users">Manage Users</a>
+            <a class="button secondary" href="/superhost/dashboard?section=pending-emails#pending-emails">Pending Emails</a>
+            <form action="/superhost/mentors/bulk-activate" method="POST" class="inline-form quick-action-form">
+              <button type="submit" class="button secondary">Bulk Activate</button>
+            </form>
+            <a class="button secondary" href="/superhost/dashboard?section=users#users">Reset Requests (0)</a>
+            <a class="button secondary" href="/superhost/exports/mentor-emails.csv">Export Emails</a>
+            <a class="button" href="/superhost/dashboard?section=revenue#revenue">Revenue</a>
+          </div>
+
+          <div class="revenue-mini-card">
+            <p class="hint">Revenue This Month</p>
+            <p class="status-value">$<%= Number(revenue.monthlyRevenueUsd || 0).toFixed(2) %></p>
+            <p class="hint">Paid subscriptions: <strong><%= revenue.monthlyPaidSubscriptions || 0 %></strong></p>
+          </div>
+
+          <div class="storage-status-card">
+            <p class="hint">Storage Status</p>
+            <p class="status-value"><%= storage.exists ? 'Persistent' : 'Unavailable' %></p>
+            <p class="hint">Last save: <strong><%= storage.lastUpdatedLabel %></strong></p>
+            <p class="hint">DB size: <strong><%= Number(storage.sizeKb || 0).toFixed(2) %> KB</strong></p>
+            <p class="hint">Path: <code class="storage-path"><%= storage.dataFilePath %></code></p>
+          </div>
         </article>
       </div>
     </section>
 
     <section class="panel-grid single <%= activeSection === 'users' ? '' : 'section-hidden' %>" id="users">
       <article class="panel">
-        <h2>Users</h2>
-        <p class="hint">Manage mentor signups, key limits, generated keys, and active paid subscribers.</p>
+        <h2>Manage Users</h2>
+        <p class="hint">Control mentor approvals, subscriptions, and key limits.</p>
+
+        <form action="/superhost/dashboard" method="GET" class="dashboard-search-form users-search-form">
+          <input type="hidden" name="section" value="users" />
+          <input
+            type="search"
+            name="userSearch"
+            value="<%= mentorSearchQueryRaw || '' %>"
+            placeholder="Search users by name, email, phone or Mentor ID"
+          />
+          <button type="submit" class="button mini">Search</button>
+          <% if (mentorSearchQueryRaw) { %>
+          <a href="/superhost/dashboard?section=users#users" class="button mini secondary">Clear</a>
+          <% } %>
+        </form>
+
+        <% if (mentorSearchQueryRaw) { %>
+        <p class="hint">Showing <strong><%= mentors.length %></strong> result(s) for <strong><%= mentorSearchQueryRaw %></strong>.</p>
+        <% } %>
 
         <% if (!mentors.length) { %>
-        <p class="hint">No mentors registered yet.</p>
+        <p class="hint">No mentors found for this search.</p>
         <% } else { %>
         <div class="users-list">
           <% mentors.forEach((mentor) => { %>
@@ -244,50 +374,143 @@
       </article>
     </section>
 
-    <section class="panel-grid single <%= activeSection === 'my-profile' ? '' : 'section-hidden' %>" id="my-profile">
+    <section class="panel-grid single <%= activeSection === 'pending-emails' ? '' : 'section-hidden' %>" id="pending-emails">
       <article class="panel">
-        <h2>My Profile (Superhost Test Lab)</h2>
-        <p class="hint">Profile details are for portal use only.</p>
+        <div class="panel-head-row">
+          <h2>Pending Emails</h2>
+          <span class="pill"><%= pendingEmailItems.length %> pending</span>
+        </div>
+        <p class="hint">These are generated license keys where email delivery has not yet been confirmed.</p>
 
-        <form action="/superhost/profile" method="POST" class="stack-form">
-          <div class="row-fields">
-            <label>
-              Display Name
-              <input type="text" name="name" value="<%= labAccount.name %>" required />
-            </label>
+        <% if (!pendingEmailItems.length) { %>
+        <p class="hint">No pending license emails right now.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Mentor</th>
+                <th>Client Email</th>
+                <th>EA</th>
+                <th>Duration</th>
+                <th>Key</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pendingEmailItems.forEach((item) => { %>
+              <tr>
+                <td><%= item.createdLabel %></td>
+                <td><%= item.mentorName %> (#<%= item.mentorPortalId %>)</td>
+                <td><%= item.clientEmail %></td>
+                <td><%= item.robotName %></td>
+                <td><%= item.durationLabel %></td>
+                <td>
+                  <div class="key-copy-row">
+                    <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
+                    <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+                  </div>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+      </article>
+    </section>
 
-            <label>
-              Profile Headline
-              <input type="text" name="profileHeadline" value="<%= labAccount.profileHeadline || '' %>" placeholder="Platform Superhost" />
-            </label>
-          </div>
+    <section class="panel-grid single <%= activeSection === 'revenue' ? '' : 'section-hidden' %>" id="revenue">
+      <article class="panel">
+        <h2>Revenue</h2>
+        <p class="hint">Revenue equals paid subscriptions based on selected client packages. Displayed in USD with package/date details.</p>
 
-          <label>
-            Bio
-            <textarea name="profileBio" rows="3"><%= labAccount.profileBio || '' %></textarea>
-          </label>
+        <div class="revenue-summary-grid">
+          <article class="business-card">
+            <h3>Total Paid Subscriptions</h3>
+            <p class="business-value"><%= revenue.totalPaidSubscriptions || 0 %></p>
+          </article>
+          <article class="business-card">
+            <h3>Paid This Month</h3>
+            <p class="business-value"><%= revenue.monthlyPaidSubscriptions || 0 %></p>
+          </article>
+          <article class="business-card">
+            <h3>Total Revenue (USD)</h3>
+            <p class="business-value">$<%= Number(revenue.totalRevenueUsd || 0).toFixed(2) %></p>
+          </article>
+          <article class="business-card">
+            <h3>Revenue This Month (USD)</h3>
+            <p class="business-value">$<%= Number(revenue.monthlyRevenueUsd || 0).toFixed(2) %></p>
+            <p class="hint">Rate: 1 USD = <%= Number(revenue.exchangeRateUsdZar || 0).toFixed(2) %> ZAR</p>
+          </article>
+        </div>
 
-          <div class="row-fields">
-            <label>
-              Phone
-              <input type="text" name="profilePhone" value="<%= labAccount.profilePhone || '' %>" />
-            </label>
+        <h3>Package Breakdown</h3>
+        <% if (!packageRows.length) { %>
+        <p class="hint">No paid package activity yet.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Paid Subscriptions</th>
+                <th>Total (USD)</th>
+                <th>Total (ZAR)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% packageRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.planLabel %></td>
+                <td><%= row.count %></td>
+                <td>$<%= Number(row.totalUsd || 0).toFixed(2) %></td>
+                <td>R<%= Number(row.totalZar || 0).toFixed(2) %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
 
-            <label>
-              Profile Image URL
-              <input type="url" name="profileImageUrl" value="<%= labAccount.profileImageUrl || '' %>" placeholder="https://..." />
-            </label>
-          </div>
-
-          <button type="submit" class="button">Save My Profile</button>
-        </form>
+        <h3>Recent Paid Subscriptions</h3>
+        <% if (!payments.length) { %>
+        <p class="hint">No paid subscriptions yet.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Package</th>
+                <th>Amount (USD)</th>
+                <th>Client</th>
+                <th>Mentor</th>
+                <th>Ends</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% payments.forEach((payment) => { %>
+              <tr>
+                <td><%= payment.dateLabel %></td>
+                <td><%= payment.planLabel %></td>
+                <td>$<%= Number(payment.amountUsd || 0).toFixed(2) %></td>
+                <td><%= payment.clientEmail %></td>
+                <td><%= payment.mentorName %> (#<%= payment.mentorPortalId %>)</td>
+                <td><%= payment.endsAtLabel %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
       </article>
     </section>
 
     <section class="panel-grid single <%= activeSection === 'track-business' ? '' : 'section-hidden' %>" id="track-business">
       <article class="panel">
         <h2>Track My Business</h2>
-        <p class="hint">Mentor-style metrics for superhost testing and benchmarking.</p>
+        <p class="hint">Superhost lab metrics for testing pricing and sales targets.</p>
 
         <form action="/superhost/business-settings" method="POST" class="stack-form">
           <div class="row-fields">
@@ -348,159 +571,10 @@
       </article>
     </section>
 
-    <section class="stats-grid <%= activeSection === 'client-keys' ? '' : 'section-hidden' %>" id="client-keys">
-      <article class="panel">
-        <h2>Client Keys (Superhost Test Lab)</h2>
-        <p><strong>Email:</strong> <%= labAccount.email %></p>
-        <p><strong>Lab ID:</strong> <%= labAccount.mentorPortalId || 'SUPERHOST' %></p>
-        <p><strong>Subscription Active:</strong> <%= labAccount.subscriptionActive ? 'Yes' : 'No' %></p>
-        <p><strong>License Keys Used:</strong> <%= labActiveKeysUsed %> / <%= labAccount.licenseKeyLimit %></p>
-
-        <form action="/superhost/license-keys/generate" method="POST" class="stack-form">
-          <label>
-            Client Email
-            <input type="email" name="clientEmail" placeholder="client@example.com" required />
-          </label>
-
-          <label>
-            Expert Advisor (Robot)
-            <select name="robotId" required>
-              <option value="">Select robot</option>
-              <% labRobots.forEach((robot) => { %>
-              <option value="<%= robot.id %>"><%= robot.name %></option>
-              <% }) %>
-            </select>
-          </label>
-
-          <label>
-            License Key Duration
-            <select name="durationCode" required>
-              <option value="">Select duration</option>
-              <% licenseDurationOptions.forEach((item) => { %>
-              <option value="<%= item.code %>"><%= item.label %></option>
-              <% }) %>
-            </select>
-          </label>
-          <button type="submit" class="button" <%= labRobots.length ? '' : 'disabled' %>>
-            Generate & Email Key
-          </button>
-        </form>
-
-        <% if (!labRobots.length) { %>
-        <p class="hint">Create at least one robot first before generating keys.</p>
-        <% } %>
-
-        <% if (!labLicenseKeys.length) { %>
-        <p class="hint">No client keys generated yet.</p>
-        <% } else { %>
-        <ul class="list key-list">
-          <% labLicenseKeys.forEach((item) => { %>
-          <li class="key-entry">
-            <div class="key-copy-row">
-              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
-              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
-            </div>
-            <p class="hint">
-              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
-              EA: <strong><%= item.robotName || 'Not set' %></strong> |
-              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
-            </p>
-            <% if (item.redeemedAt || item.status === 'redeemed') { %>
-            <span class="pill ok">redeemed</span>
-            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
-            <% } else if (item.reservedClientEmail) { %>
-            <span class="pill">reserved</span>
-            <span class="hint">for <%= item.reservedClientEmail %></span>
-            <% } else { %>
-            <span class="pill">available</span>
-            <% } %>
-          </li>
-          <% }) %>
-        </ul>
-        <% } %>
-      </article>
-    </section>
-
-    <section class="panel-grid single <%= activeSection === 'create-robot' ? '' : 'section-hidden' %>" id="create-robot">
-      <article class="panel">
-        <h2>Create Robot Profile (Superhost Test Lab)</h2>
-
-        <form action="/superhost/robots" method="POST" class="stack-form">
-          <label>
-            Robot Name
-            <input type="text" name="name" required />
-          </label>
-
-          <label>
-            Description
-            <textarea name="description" rows="3"></textarea>
-          </label>
-
-          <label>
-            Category
-            <input type="text" name="category" placeholder="Trading bot, assistant, support" />
-          </label>
-
-          <label>
-            Robot Picture URL (Shown on client app)
-            <input type="url" name="imageUrl" placeholder="https://..." />
-          </label>
-
-          <label>
-            Symbols (comma or new line separated)
-            <textarea name="allowedSymbols" rows="2" placeholder="XAUUSD, GBPUSD, .US30., BTCUSD"><%= defaultSymbolsText %></textarea>
-          </label>
-
-          <div class="row-fields">
-            <label>
-              Version
-              <input type="text" name="version" placeholder="v1.0.0" />
-            </label>
-
-            <label>
-              Status
-              <select name="status">
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-              </select>
-            </label>
-          </div>
-
-          <h3>Key Stats</h3>
-          <div class="row-fields">
-            <label>
-              Uptime (hours)
-              <input type="number" step="1" name="uptimeHours" value="0" />
-            </label>
-
-            <label>
-              Tasks Completed
-              <input type="number" step="1" name="tasksCompleted" value="0" />
-            </label>
-          </div>
-
-          <div class="row-fields">
-            <label>
-              Success Rate (%)
-              <input type="number" step="0.01" name="successRate" value="0" />
-            </label>
-
-            <label>
-              Last Sync
-              <input type="text" name="lastSync" placeholder="2026-04-14T10:00:00Z" />
-            </label>
-          </div>
-
-          <button type="submit" class="button">Create Robot</button>
-        </form>
-      </article>
-    </section>
-
     <section class="panel-grid single <%= activeSection === 'my-robots' ? '' : 'section-hidden' %>" id="my-robots">
       <article class="panel">
-        <h2>Manage EAs (Superhost Test Lab)</h2>
-        <p class="hint">Create EAs, issue keys, and maintain symbols from one clean section.</p>
+        <h2>Manage EAs (Superhost Lab)</h2>
+        <p class="hint">Create EAs, issue keys, and keep symbols and mobile builds updated.</p>
         <p><strong>License Keys Used:</strong> <%= labActiveKeysUsed %> / <%= labAccount.licenseKeyLimit %></p>
 
         <% if (!labAccount.subscriptionActive) { %>
@@ -584,7 +658,8 @@
 
         <hr class="subtle-divider" />
 
-        <h3>Manage Keys</h3>
+        <h3>Generate License Key</h3>
+
         <form action="/superhost/license-keys/generate" method="POST" class="stack-form">
           <label>
             Client Email
@@ -700,7 +775,9 @@
                 </td>
                 <td>
                   <form action="/superhost/robots/<%= robot.id %>/convert-mobile" method="POST">
-                    <button type="submit" class="button mini">Convert to Mobile</button>
+                    <button type="submit" class="button mini">
+                      <%= robot.mobileBuild && robot.mobileBuild.status === 'ready' ? 'Rebuild Mobile' : 'Convert to Mobile' %>
+                    </button>
                   </form>
                 </td>
               </tr>
@@ -741,7 +818,7 @@
     <section class="panel-grid single <%= activeSection === 'portal-theme' ? '' : 'section-hidden' %>" id="portal-theme">
       <article class="panel">
         <h2>Portal Theme</h2>
-        <p class="hint">Theme controls moved lower so stats and operations show first.</p>
+        <p class="hint">Use presets or custom colors. Keep this section separate from daily operations.</p>
 
         <div class="cta-row">
           <form action="/superhost/theme" method="POST" class="inline-form">
@@ -789,6 +866,46 @@
           <div class="cta-row">
             <button type="submit" class="button">Save Theme</button>
           </div>
+        </form>
+      </article>
+    </section>
+
+    <section class="panel-grid single <%= activeSection === 'my-profile' ? '' : 'section-hidden' %>" id="my-profile">
+      <article class="panel">
+        <h2>My Profile (Superhost Lab)</h2>
+        <p class="hint">Profile details are for portal display only.</p>
+
+        <form action="/superhost/profile" method="POST" class="stack-form">
+          <div class="row-fields">
+            <label>
+              Display Name
+              <input type="text" name="name" value="<%= labAccount.name %>" required />
+            </label>
+
+            <label>
+              Profile Headline
+              <input type="text" name="profileHeadline" value="<%= labAccount.profileHeadline || '' %>" placeholder="Platform Superhost" />
+            </label>
+          </div>
+
+          <label>
+            Bio
+            <textarea name="profileBio" rows="3"><%= labAccount.profileBio || '' %></textarea>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Phone
+              <input type="text" name="profilePhone" value="<%= labAccount.profilePhone || '' %>" />
+            </label>
+
+            <label>
+              Profile Image URL
+              <input type="url" name="profileImageUrl" value="<%= labAccount.profileImageUrl || '' %>" placeholder="https://..." />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Save My Profile</button>
         </form>
       </article>
     </section>
