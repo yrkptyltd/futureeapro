@@ -346,9 +346,6 @@
         <h3>Your Expert Advisors</h3>
         <p class="hint">All EAs registered under your account</p>
 
-        <% if (!robots.length) { %>
-        <p class="hint">No robots created yet.</p>
-        <% } else { %>
         <div class="table-wrap">
           <table>
             <thead>
@@ -361,6 +358,11 @@
               </tr>
             </thead>
             <tbody>
+              <% if (!robots.length) { %>
+              <tr>
+                <td colspan="5" class="hint">No EAs created yet.</td>
+              </tr>
+              <% } else { %>
               <% robots.forEach((robot) => { %>
               <tr>
                 <td>
@@ -376,10 +378,10 @@
                 </td>
               </tr>
               <% }) %>
+              <% } %>
             </tbody>
           </table>
         </div>
-        <% } %>
       </article>
     </section>
 
