@@ -68,6 +68,8 @@ const CLIENT_PLANS = {
 const CLIENT_PLAN_LIST = Object.values(CLIENT_PLANS);
 const LICENSE_KEY_DURATIONS = {
   days_3: { code: 'days_3', label: '3 Days', mode: 'days', value: 3 },
+  days_5: { code: 'days_5', label: '5 Days', mode: 'days', value: 5 },
+  days_30: { code: 'days_30', label: '30 Days', mode: 'days', value: 30 },
   month_1: { code: 'month_1', label: '1 Month', mode: 'months', value: 1 },
   month_3: { code: 'month_3', label: '3 Months', mode: 'months', value: 3 },
   month_6: { code: 'month_6', label: '6 Months', mode: 'months', value: 6 },
@@ -908,10 +910,12 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
 
   const licenseKeys = listLicenseKeysByMentor(req.currentUser.id);
   const totalGenerated = licenseKeys.length;
+  const clientName = String(body.clientName || '').trim();
   const reservedClientEmail = normalizeEmail(body.clientEmail);
   const robotId = String(body.robotId || '').trim();
   const durationOption = getLicenseDurationOption(body.durationCode);
   const robot = getRobotById(robotId);
+  const confirmGenerate = String(body.confirmGenerate || '').trim().toLowerCase();
 
   if (!reservedClientEmail || !reservedClientEmail.includes('@')) {
     setFlash(req, 'error', 'Client email is required and must be valid.');
@@ -925,6 +929,11 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
 
   if (!durationOption) {
     setFlash(req, 'error', 'Choose a valid key duration.');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
+  }
+
+  if (confirmGenerate !== 'yes') {
+    setFlash(req, 'error', 'Please confirm that you want to generate this license key.');
     return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
@@ -954,6 +963,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     mentorName: mentor.name,
     mentorEmail: mentor.email,
     mentorPortalId: mentor.mentorPortalId,
+    clientName,
     clientEmail: reservedClientEmail,
     key: createdKey.key,
     robotName: robot.name,
@@ -2197,6 +2207,7 @@ async function sendLicenseKeyEmail(payload) {
     'no-reply@futureeapro.com';
 
   const keyText = String(payload.key || '').trim();
+  const clientName = String(payload.clientName || '').trim();
   const robotName = String(payload.robotName || 'Your Expert Advisor').trim();
   const subject = `${APP_NAME} License Key - ${robotName}`;
   const expiryText = payload.expiresAt
@@ -2207,7 +2218,7 @@ async function sendLicenseKeyEmail(payload) {
     <div style="font-family:Arial,sans-serif;background:#0b0c12;color:#f4f5f8;padding:24px;">
       <div style="max-width:640px;margin:0 auto;border:1px solid #2b2f40;border-radius:14px;background:#11141d;padding:22px;">
         <h1 style="margin:0 0 12px;font-size:22px;color:#ff6b76;">Future EA Pro License Key</h1>
-        <p style="margin:0 0 16px;color:#c8cedf;">Hello, your mentor has issued your Expert Advisor license key.</p>
+        <p style="margin:0 0 16px;color:#c8cedf;">Hello${clientName ? ` ${escapeHtml(clientName)}` : ''}, your mentor has issued your Expert Advisor license key.</p>
         <p style="margin:0 0 8px;"><strong>Mentor:</strong> ${escapeHtml(payload.mentorName || '')}</p>
         <p style="margin:0 0 8px;"><strong>Mentor ID:</strong> ${escapeHtml(String(payload.mentorPortalId || ''))}</p>
         <p style="margin:0 0 8px;"><strong>Expert Advisor:</strong> ${escapeHtml(robotName)}</p>
@@ -2225,6 +2236,7 @@ async function sendLicenseKeyEmail(payload) {
   const text = [
     `Future EA Pro License Key`,
     ``,
+    clientName ? `Client: ${clientName}` : null,
     `Mentor: ${payload.mentorName || ''}`,
     `Mentor ID: ${payload.mentorPortalId || ''}`,
     `Expert Advisor: ${robotName}`,
@@ -2234,7 +2246,9 @@ async function sendLicenseKeyEmail(payload) {
     `LICENSE KEY: ${keyText}`,
     ``,
     `Unlock at: https://futureeapro.com/client`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   try {
     await transporter.sendMail({

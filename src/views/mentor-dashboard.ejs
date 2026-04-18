@@ -1,5 +1,14 @@
 <%- include('partials/top', { title: title }) %>
 <% const activeSection = currentSection || 'overview'; %>
+<%
+  const durationCardOrder = ['days_3', 'days_5', 'days_30', 'month_3', 'month_6', 'year_1', 'lifetime'];
+  const durationCardOptions = durationCardOrder
+    .map((code) => (licenseDurationOptions || []).find((item) => item.code === code))
+    .filter(Boolean);
+  const defaultDurationCode = durationCardOptions.find((item) => item.code === 'days_30')
+    ? 'days_30'
+    : (durationCardOptions[0] ? durationCardOptions[0].code : '');
+%>
 
 <section class="mentor-layout drawer-layout">
   <button
@@ -251,7 +260,7 @@
     <section class="panel-grid single <%= activeSection === 'manage-eas' ? '' : 'section-hidden' %>" id="manage-eas">
       <article class="panel">
         <h2>Manage EAs</h2>
-        <p class="hint">Create new robots and generate client license keys from this section.</p>
+        <p class="hint">Create, test, and manage Expert Advisors.</p>
 
         <% if (!mentor.subscriptionActive) { %>
         <p class="warning">Your subscription is currently inactive. Ask superhost to reactivate access.</p>
@@ -334,67 +343,132 @@
 
     <section class="panel-grid single <%= activeSection === 'generate-key' ? '' : 'section-hidden' %>" id="generate-key">
       <article class="panel">
-        <h2>Generate License Key</h2>
-        <p class="hint">Keys are generated, reserved to the client email, and emailed automatically.</p>
+        <div class="generate-key-heading">
+          <span class="generate-key-badge" aria-hidden="true">🔑</span>
+          <h2>Generate <span class="accent-text">License Key</span></h2>
+        </div>
 
-        <form action="/mentor/license-keys/generate" method="POST" class="stack-form">
-          <label>
-            Client Email
-            <input type="email" name="clientEmail" placeholder="client@example.com" required />
-          </label>
+        <section class="generate-key-card">
+          <div class="panel-head-row">
+            <h3>New License Key</h3>
+            <p class="hint">Enter user details and select EA authorization.</p>
+          </div>
 
-          <label>
-            Expert Advisor (Robot)
-            <select name="robotId" required>
-              <option value="">Select robot</option>
-              <% robots.forEach((robot) => { %>
-              <option value="<%= robot.id %>"><%= robot.name %></option>
-              <% }) %>
-            </select>
-          </label>
+          <form action="/mentor/license-keys/generate" method="POST" class="stack-form generate-key-form">
+            <label>
+              User Name
+              <input type="text" name="clientName" placeholder="Enter the user's name" />
+            </label>
 
-          <label>
-            License Key Duration
-            <select name="durationCode" required>
-              <option value="">Select duration</option>
-              <% licenseDurationOptions.forEach((item) => { %>
-              <option value="<%= item.code %>"><%= item.label %></option>
-              <% }) %>
-            </select>
-          </label>
-          <button type="submit" class="button" <%= robots.length ? '' : 'disabled' %>>
-            Generate & Email Key
-          </button>
-        </form>
+            <label>
+              User Email
+              <input type="email" name="clientEmail" placeholder="Enter the user's email" required />
+            </label>
 
-        <% if (!licenseKeys.length) { %>
-        <p class="hint">No client keys generated yet.</p>
-        <% } else { %>
-        <ul class="list key-list">
-          <% licenseKeys.forEach((item) => { %>
-          <li class="key-entry">
-            <div class="key-copy-row">
-              <input type="text" class="key-copy-input" value="<%= item.key %>" readonly />
-              <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+            <label>
+              Select EA
+              <select name="robotId" required>
+                <option value="">Choose an Expert Advisor</option>
+                <% robots.forEach((robot) => { %>
+                <option value="<%= robot.id %>"><%= robot.name %></option>
+                <% }) %>
+              </select>
+            </label>
+
+            <fieldset class="duration-picker">
+              <legend>License Duration</legend>
+              <div class="duration-options">
+                <% durationCardOptions.forEach((item) => { %>
+                <%
+                  const labelText = String(item.label || '').trim();
+                  const match = labelText.match(/\d+/);
+                  const valueText = match ? match[0] : (item.code === 'lifetime' ? '∞' : labelText);
+                  const unitText = item.code === 'lifetime'
+                    ? 'LIFETIME'
+                    : labelText.replace(/^\d+\s*/, '').replace(/[()]/g, '').replace('∞', '').trim().toUpperCase();
+                %>
+                <label class="duration-option">
+                  <input
+                    type="radio"
+                    name="durationCode"
+                    value="<%= item.code %>"
+                    <%= item.code === defaultDurationCode ? 'checked' : '' %>
+                    required
+                  />
+                  <span class="duration-option-inner">
+                    <span class="duration-value"><%= valueText %></span>
+                    <span class="duration-unit"><%= unitText %></span>
+                  </span>
+                </label>
+                <% }) %>
+              </div>
+            </fieldset>
+
+            <div class="generate-info-bar">
+              The key is generated instantly and emailed to the client. The user enters this key in MT4/MT5 to unlock the EA.
             </div>
-            <p class="hint">
-              Client: <strong><%= item.reservedClientEmail || 'N/A' %></strong> |
-              EA: <strong><%= item.robotName || 'Not set' %></strong> |
-              Duration: <strong><%= item.durationLabel || 'Not set' %></strong>
-            </p>
-            <% if (item.redeemedAt || item.status === 'redeemed') { %>
-            <span class="pill ok">redeemed</span>
-            <span class="hint">by <%= item.redeemedByClientEmail || 'client' %></span>
-            <% } else if (item.reservedClientEmail) { %>
-            <span class="pill">reserved</span>
-            <span class="hint">for <%= item.reservedClientEmail %></span>
-            <% } else { %>
-            <span class="pill">available</span>
-            <% } %>
-          </li>
-          <% }) %>
-        </ul>
-        <% } %>
+
+            <label class="confirm-check">
+              <input type="checkbox" name="confirmGenerate" value="yes" required />
+              <span>I confirm that I want to generate this license key.</span>
+            </label>
+
+            <div class="cta-row">
+              <button type="submit" class="button" <%= robots.length ? '' : 'disabled' %>>Generate License Key</button>
+              <button type="reset" class="button secondary">Clear</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="generate-key-card compact">
+          <div class="panel-head-row">
+            <h3>Generated Keys</h3>
+            <p class="hint"><%= licenseKeys.length %> total</p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Client</th>
+                  <th>EA</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!licenseKeys.length) { %>
+                <tr>
+                  <td colspan="6" class="hint">No keys generated yet.</td>
+                </tr>
+                <% } else { %>
+                <% licenseKeys.forEach((item) => { %>
+                <tr>
+                  <td><strong><%= item.key %></strong></td>
+                  <td><%= item.reservedClientEmail || 'N/A' %></td>
+                  <td><%= item.robotName || 'Not set' %></td>
+                  <td><%= item.durationLabel || 'Not set' %></td>
+                  <td>
+                    <% if (item.redeemedAt || item.status === 'redeemed') { %>
+                    <span class="pill ok">redeemed</span>
+                    <% } else if (item.reservedClientEmail) { %>
+                    <span class="pill">reserved</span>
+                    <% } else { %>
+                    <span class="pill">available</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.key %>">Copy</button>
+                  </td>
+                </tr>
+                <% }) %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </article>
     </section>
 
