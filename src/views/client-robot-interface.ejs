@@ -10,11 +10,32 @@
     settings: 'Settings',
   };
   const activeLabel = sectionLabels[activeSection] || 'Home';
-  const robotName = featuredRobot ? featuredRobot.name : 'Algo Nova EA v6';
+  const robotName = featuredRobot ? featuredRobot.name : (defaultRobotName || 'Future EA Pro Core');
   const robotImage = (featuredRobot && featuredRobot.imageUrl) ? featuredRobot.imageUrl : '/assets/robots/robot-aurora.jpg';
+  const mediaLibrary = Array.isArray(backgroundMediaLibrary) ? backgroundMediaLibrary : [];
+  const defaultMediaId = defaultBackgroundMediaId || (mediaLibrary.length ? mediaLibrary[0].id : '');
 %>
 
-<section class="client-app-root" data-default-robot-bg="<%= robotImage %>">
+<section
+  class="client-app-root"
+  data-default-robot-bg="<%= robotImage %>"
+  data-default-media-id="<%= defaultMediaId %>"
+>
+  <div class="client-media-stage" aria-hidden="true">
+    <video
+      class="client-bg-video"
+      data-client-bg-video
+      autoplay
+      loop
+      muted
+      playsinline
+      preload="metadata"
+    ></video>
+    <img src="<%= robotImage %>" alt="" class="client-bg-image" data-client-bg-image />
+    <div class="client-media-overlay"></div>
+    <div class="client-media-vignette"></div>
+  </div>
+
   <button
     id="client-menu-toggle"
     type="button"
@@ -422,8 +443,47 @@
       </article>
 
       <article class="panel">
+        <h3>Animated Backgrounds</h3>
+        <p class="hint">Choose moving videos or still images for your robot app.</p>
+        <div class="bg-media-grid">
+          <% mediaLibrary.forEach((media) => { %>
+          <button
+            type="button"
+            class="bg-media-choice"
+            data-bg-media-choice="<%= media.id %>"
+          >
+            <span class="bg-media-thumb">
+              <% if (media.type === 'video') { %>
+              <video src="<%= media.src %>" muted playsinline loop preload="metadata" poster="<%= media.poster || '' %>"></video>
+              <% } else { %>
+              <img src="<%= media.poster || media.src %>" alt="<%= media.label %>" loading="lazy" />
+              <% } %>
+            </span>
+            <span class="bg-media-copy">
+              <strong><%= media.label %></strong>
+              <small><%= media.type === 'video' ? 'Animated' : 'Still image' %></small>
+            </span>
+          </button>
+          <% }) %>
+        </div>
+
+        <label>
+          Background Media URL
+          <input
+            type="url"
+            data-bg-media-url-input
+            placeholder="https://example.com/background.mp4 or .jpg"
+          />
+        </label>
+        <div class="cta-row">
+          <button type="button" class="button mini" data-action="apply-background-media-url">Apply URL</button>
+          <button type="button" class="button mini secondary" data-action="reset-background-media">Use Default</button>
+        </div>
+      </article>
+
+      <article class="panel">
         <h3>Robot Picture Background</h3>
-        <p class="hint">Use any robot image as full-screen app background.</p>
+        <p class="hint">Use your robot image as full-screen fallback background.</p>
         <label>
           Robot Image URL
           <input
@@ -452,6 +512,7 @@
 
 </section>
 
+<script id="client-media-library" type="application/json"><%- JSON.stringify(mediaLibrary) %></script>
 <script src="/client-face.js" defer></script>
 <script src="/client-robot-interface.js" defer></script>
 

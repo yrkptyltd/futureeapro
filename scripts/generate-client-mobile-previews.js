@@ -32,8 +32,8 @@ const RED_THEME = {
   bgEnd: '#1a1117',
   glow: '#ffe7eb',
 };
-const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-aurora.jpg';
-const PREVIEW_ROBOT_NAME = 'Algo Nova EA V6';
+const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-orion.jpg';
+const PREVIEW_ROBOT_NAME = 'Future EA Pro Sentinel';
 
 const SCENARIOS = [
   {
@@ -55,6 +55,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'square',
     bgStyle: 'robot',
     bottomShade: 'red',
+    backgroundMediaId: 'uploaded-video-01',
   },
   {
     slug: 'pink-pill',
@@ -62,6 +63,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'pill',
     bgStyle: 'v2',
     bottomShade: 'pink',
+    backgroundMediaId: 'uploaded-video-02',
   },
   {
     slug: 'cyan-frame',
@@ -69,6 +71,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'v4',
     bottomShade: 'blue',
+    backgroundMediaId: 'future-image-orion',
   },
   {
     slug: 'custom-superpill',
@@ -76,6 +79,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'super-pill',
     bgStyle: 'off',
     bottomShade: 'custom',
+    backgroundMediaId: 'uploaded-image-01',
     customShade: {
       hue: 338,
       sat: 0.73,
@@ -88,6 +92,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'capsule',
     bgStyle: 'v3',
     bottomShade: 'purple',
+    backgroundMediaId: 'uploaded-video-02',
   },
   {
     slug: 'acid-lime-frame',
@@ -95,6 +100,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'off',
     bottomShade: 'custom',
+    backgroundMediaId: 'future-image-ember',
     customShade: {
       hue: 104,
       sat: 0.92,
@@ -107,6 +113,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'rounded',
     bgStyle: 'v1',
     bottomShade: 'custom',
+    backgroundMediaId: 'uploaded-video-01',
     customShade: {
       hue: 24,
       sat: 0.92,
@@ -119,6 +126,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'v4',
     bottomShade: 'custom',
+    backgroundMediaId: 'future-image-aurora',
     customShade: {
       hue: 322,
       sat: 0.88,
@@ -131,6 +139,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'pill',
     bgStyle: 'v2',
     bottomShade: 'custom',
+    backgroundMediaId: 'uploaded-video-02',
     customShade: {
       hue: 190,
       sat: 0.86,
@@ -143,6 +152,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'super-pill',
     bgStyle: 'off',
     bottomShade: 'custom',
+    backgroundMediaId: 'future-image-orion',
     customShade: {
       hue: 218,
       sat: 0.9,
@@ -402,11 +412,15 @@ async function applyClientVariantSettings(page, variant) {
       ['futureeapro.client.faceStyle', settings.faceStyle || 'square'],
       ['futureeapro.client.backgroundMode', settings.bgStyle || 'robot'],
       ['futureeapro.client.bottomShade', settings.bottomShade || 'red'],
+      ['futureeapro.client.backgroundMediaId', settings.backgroundMediaId || 'uploaded-video-01'],
     ];
 
     for (const [key, value] of entries) {
       localStorage.setItem(key, String(value));
     }
+
+    localStorage.removeItem('futureeapro.client.backgroundMediaUrl');
+    localStorage.removeItem('futureeapro.client.backgroundMediaType');
 
     if (settings.customShade && settings.bottomShade === 'custom') {
       localStorage.setItem('futureeapro.client.customShadeHue', String(settings.customShade.hue));

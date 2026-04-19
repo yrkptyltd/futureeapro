@@ -114,7 +114,60 @@ const DEFAULT_ROBOT_IMAGE_URLS = [
   '/assets/robots/robot-ember.jpg',
   '/assets/robots/robot-orion.jpg',
 ];
+const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
+const LEGACY_ROBOT_NAME_PATTERN = /algo\s*nova\s*ea\s*v?6/i;
+const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
+  {
+    id: 'uploaded-video-01',
+    label: 'Neon Flux Motion',
+    type: 'video',
+    src: '/assets/background-videos/future-theme-01.mp4',
+    poster: '/assets/backgrounds/future-theme-style-reference.jpg',
+    themeHint: 'red',
+  },
+  {
+    id: 'uploaded-video-02',
+    label: 'Cyber Pulse Motion',
+    type: 'video',
+    src: '/assets/background-videos/future-theme-02.mp4',
+    poster: '/assets/backgrounds/future-theme-upload-01.jpg',
+    themeHint: 'purple',
+  },
+  {
+    id: 'uploaded-image-01',
+    label: 'Uploaded Neon Frame',
+    type: 'image',
+    src: '/assets/backgrounds/future-theme-upload-01.jpg',
+    poster: '/assets/backgrounds/future-theme-upload-01.jpg',
+    themeHint: 'blue',
+  },
+  {
+    id: 'future-image-aurora',
+    label: 'Aurora Robot',
+    type: 'image',
+    src: '/assets/robots/robot-aurora.jpg',
+    poster: '/assets/robots/robot-aurora.jpg',
+    themeHint: 'red',
+  },
+  {
+    id: 'future-image-orion',
+    label: 'Orion Robot',
+    type: 'image',
+    src: '/assets/robots/robot-orion.jpg',
+    poster: '/assets/robots/robot-orion.jpg',
+    themeHint: 'cyan',
+  },
+  {
+    id: 'future-image-ember',
+    label: 'Ember Robot',
+    type: 'image',
+    src: '/assets/robots/robot-ember.jpg',
+    poster: '/assets/robots/robot-ember.jpg',
+    themeHint: 'orange',
+  },
+];
+const CLIENT_DEFAULT_BACKGROUND_MEDIA_ID = 'uploaded-image-01';
 const THEME_PRESETS = {
   dope_red: {
     label: 'Dope Red (Default)',
@@ -222,6 +275,7 @@ ensureMentorPortalIds();
 ensureDefaultThemePalette();
 bootstrapSuperhost();
 migrateLegacyRobotImages();
+migrateLegacyRobotNames();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -660,8 +714,11 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     subscription,
     mentor,
     featuredRobot,
+    defaultRobotName: DEFAULT_ROBOT_NAME,
     plan,
     activeSection,
+    backgroundMediaLibrary: CLIENT_BACKGROUND_MEDIA_LIBRARY,
+    defaultBackgroundMediaId: CLIENT_DEFAULT_BACKGROUND_MEDIA_ID,
     brokerOptions: METRADER_BROKERS,
     brokerConnections,
     quoteRows: buildQuoteRows(symbols),
@@ -860,11 +917,12 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
     return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
 
-  const name = String(body.name || '').trim();
-  if (!name) {
+  const rawName = String(body.name || '').trim();
+  if (!rawName) {
     setFlash(req, 'error', 'EA name is required (include version).');
     return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
   }
+  const name = sanitizeRobotName(rawName);
 
   const confirmAdmin = String(body.confirmAdmin || '').trim().toLowerCase();
   if (confirmAdmin !== 'yes') {
@@ -953,6 +1011,8 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
   }
 
+  const robotDisplayName = sanitizeRobotName(robot.name);
+
   if (confirmGenerate !== 'yes') {
     setFlash(req, 'error', 'Please confirm that you want to generate this license key.');
     return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
@@ -970,7 +1030,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     status: 'available',
     reservedClientEmail,
     robotId: robot.id,
-    robotName: robot.name,
+    robotName: robotDisplayName,
     durationCode: durationOption.code,
     durationLabel: durationOption.label,
     expiresAt: expiresAt ? expiresAt.toISOString() : null,
@@ -987,7 +1047,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     clientName,
     clientEmail: reservedClientEmail,
     key: createdKey.key,
-    robotName: robot.name,
+    robotName: robotDisplayName,
     durationLabel: durationOption.label,
     expiresAt: createdKey.expiresAt,
   });
@@ -1298,11 +1358,12 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
-  const name = String(body.name || '').trim();
-  if (!name) {
+  const rawName = String(body.name || '').trim();
+  if (!rawName) {
     setFlash(req, 'error', 'EA name is required (include version).');
     return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
+  const name = sanitizeRobotName(rawName);
 
   const confirmAdmin = String(body.confirmAdmin || '').trim().toLowerCase();
   if (confirmAdmin !== 'yes') {
@@ -1386,6 +1447,8 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
     return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
   }
 
+  const robotDisplayName = sanitizeRobotName(robot.name);
+
   if (totalGenerated >= superhost.licenseKeyLimit) {
     setFlash(req, 'error', 'You reached your current superhost test key limit.');
     return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
@@ -1398,7 +1461,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
     status: 'available',
     reservedClientEmail,
     robotId: robot.id,
-    robotName: robot.name,
+    robotName: robotDisplayName,
     durationCode: durationOption.code,
     durationLabel: durationOption.label,
     expiresAt: expiresAt ? expiresAt.toISOString() : null,
@@ -1415,7 +1478,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
     mentorPortalId: superhost.mentorPortalId || 'SUPERHOST',
     clientEmail: reservedClientEmail,
     key: createdKey.key,
-    robotName: robot.name,
+    robotName: robotDisplayName,
     durationLabel: durationOption.label,
     expiresAt: createdKey.expiresAt,
   });
@@ -1936,10 +1999,65 @@ function migrateLegacyRobotImages() {
   }
 }
 
+function migrateLegacyRobotNames() {
+  const users = listUsers().filter((user) => user && (user.role === 'mentor' || user.role === 'superhost'));
+
+  for (const user of users) {
+    const robots = listRobotsByMentor(user.id);
+    for (const robot of robots) {
+      const sanitizedName = sanitizeRobotName(robot.name);
+      if (sanitizedName === robot.name) {
+        continue;
+      }
+
+      updateRobot(robot.id, {
+        name: sanitizedName,
+      });
+    }
+
+    const licenseKeys = listLicenseKeysByMentor(user.id);
+    for (const keyItem of licenseKeys) {
+      const sanitizedName = sanitizeRobotName(keyItem.robotName);
+      if (sanitizedName === keyItem.robotName) {
+        continue;
+      }
+
+      updateLicenseKey(keyItem.id, {
+        robotName: sanitizedName,
+      });
+    }
+
+    const subscriptions = listClientSubscriptionsByMentor(user.id);
+    for (const subscription of subscriptions) {
+      const sanitizedName = sanitizeRobotName(subscription.robotName);
+      if (sanitizedName === subscription.robotName) {
+        continue;
+      }
+
+      updateClientSubscription(subscription.id, {
+        robotName: sanitizedName,
+      });
+    }
+  }
+}
+
+function sanitizeRobotName(inputName) {
+  const normalizedName = String(inputName || '').trim();
+  if (!normalizedName) {
+    return DEFAULT_ROBOT_NAME;
+  }
+
+  if (LEGACY_ROBOT_NAME_PATTERN.test(normalizedName)) {
+    return DEFAULT_ROBOT_NAME;
+  }
+
+  return normalizedName;
+}
+
 function pickDefaultRobotImage(seedValue) {
   const pool = DEFAULT_ROBOT_IMAGE_URLS;
   if (!pool.length) {
-    return LEGACY_RED_ROBOT_IMAGE_URL;
+    return '/assets/robots/robot-aurora.jpg';
   }
 
   const seedText = String(seedValue || '');

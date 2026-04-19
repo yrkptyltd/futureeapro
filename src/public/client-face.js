@@ -11,13 +11,24 @@
     customShadeSat: 'futureeapro.client.customShadeSat',
     customShadeVal: 'futureeapro.client.customShadeVal',
     robotBg: 'futureeapro.client.robotBackgroundImage',
+    bgMediaId: 'futureeapro.client.backgroundMediaId',
+    bgMediaUrl: 'futureeapro.client.backgroundMediaUrl',
+    bgMediaType: 'futureeapro.client.backgroundMediaType',
   };
 
   const root = document.documentElement;
   const appRoot = document.querySelector('.client-app-root');
   const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/robots/robot-aurora.jpg');
+  const defaultMediaId = String(appRoot?.dataset.defaultMediaId || '').trim();
   const faceSelectors = Array.from(document.querySelectorAll('[data-face-style-select]'));
   const faceStyleButtons = Array.from(document.querySelectorAll('[data-face-style-choice]'));
+  const mediaLibraryScript = document.getElementById('client-media-library');
+  const bgMediaButtons = Array.from(document.querySelectorAll('[data-bg-media-choice]'));
+  const bgVideo = document.querySelector('[data-client-bg-video]');
+  const bgImage = document.querySelector('[data-client-bg-image]');
+  const bgMediaUrlInput = document.querySelector('[data-bg-media-url-input]');
+  const applyBgMediaUrlButton = document.querySelector('[data-action="apply-background-media-url"]');
+  const resetBgMediaButton = document.querySelector('[data-action="reset-background-media"]');
 
   const SETTINGS = [
     {
@@ -96,6 +107,51 @@
     }
   };
 
+  const readMediaLibrary = () => {
+    if (!mediaLibraryScript) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(mediaLibraryScript.textContent || '[]');
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed;
+    } catch (_error) {
+      return [];
+    }
+  };
+
+  const isVideoSource = (value) => /\.(mp4|webm|ogg|m4v)(\?|#|$)/i.test(String(value || '').trim());
+
+  const normalizeMediaType = (typeValue, srcValue) => {
+    const normalized = String(typeValue || '').trim().toLowerCase();
+    if (normalized === 'video' || normalized === 'image') {
+      return normalized;
+    }
+    return isVideoSource(srcValue) ? 'video' : 'image';
+  };
+
+  const normalizeMediaItem = (item, fallbackId = '') => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const src = String(item.src || '').trim();
+    if (!src) {
+      return null;
+    }
+
+    return {
+      id: String(item.id || fallbackId || '').trim() || `media-${Date.now()}`,
+      label: String(item.label || item.name || 'Background').trim() || 'Background',
+      type: normalizeMediaType(item.type, src),
+      src,
+      poster: String(item.poster || '').trim() || src,
+    };
+  };
+
   const getButtonValue = (button) =>
     button.dataset.clientThemeChoice ||
     button.dataset.faceStyleChoice ||
@@ -165,11 +221,93 @@
   const bgFileInput = document.querySelector('[data-robot-bg-file]');
   const applyBgButton = document.querySelector('[data-action="apply-robot-bg-url"]');
   const resetBgButton = document.querySelector('[data-action="reset-robot-bg"]');
+  const mediaLibrary = readMediaLibrary()
+    .map((item, index) => normalizeMediaItem(item, `library-${index + 1}`))
+    .filter(Boolean);
+  const mediaLibraryById = new Map(mediaLibrary.map((item) => [item.id, item]));
+  const defaultMedia =
+    mediaLibraryById.get(defaultMediaId) ||
+    mediaLibrary[0] ||
+    normalizeMediaItem({
+      id: 'robot-default',
+      label: 'Robot Default',
+      type: 'image',
+      src: defaultRobotBg,
+      poster: defaultRobotBg,
+    });
 
   const toCssUrl = (value) => `url("${String(value).replace(/"/g, '\\\"')}")`;
 
-  const applyRobotBackgroundImage = (imageValue, options = {}) => {
+  const setActiveBackgroundChoice = (mediaId) => {
+    bgMediaButtons.forEach((button) => {
+      button.classList.toggle('active', String(button.dataset.bgMediaChoice || '') === String(mediaId || ''));
+    });
+  };
+
+  const applyBackgroundMedia = (mediaInput, options = {}) => {
     const { persist = true } = options;
+    const normalized = normalizeMediaItem(mediaInput);
+    if (!normalized) {
+      return;
+    }
+
+    root.setAttribute('data-bg-media-type', normalized.type);
+    root.style.setProperty('--client-screen-bg-image', toCssUrl(normalized.poster || normalized.src));
+
+    if (bgImage) {
+      bgImage.src = normalized.poster || normalized.src;
+    }
+
+    if (bgVideo) {
+      if (normalized.type === 'video') {
+        bgVideo.hidden = false;
+
+        if (bgVideo.getAttribute('src') !== normalized.src) {
+          bgVideo.src = normalized.src;
+          bgVideo.load();
+        }
+
+        if (normalized.poster) {
+          bgVideo.poster = normalized.poster;
+        } else {
+          bgVideo.removeAttribute('poster');
+        }
+
+        bgVideo.play().catch(() => {
+          // Ignore autoplay restrictions.
+        });
+      } else {
+        bgVideo.pause();
+        bgVideo.hidden = true;
+        bgVideo.removeAttribute('src');
+        bgVideo.load();
+      }
+    }
+
+    if (bgMediaUrlInput) {
+      bgMediaUrlInput.value = normalized.id === 'custom-url' ? normalized.src : '';
+    }
+
+    setActiveBackgroundChoice(normalized.id);
+
+    if (!persist) {
+      return;
+    }
+
+    if (mediaLibraryById.has(normalized.id)) {
+      safeWrite(STORAGE_KEYS.bgMediaId, normalized.id);
+      safeRemove(STORAGE_KEYS.bgMediaUrl);
+      safeRemove(STORAGE_KEYS.bgMediaType);
+      return;
+    }
+
+    safeWrite(STORAGE_KEYS.bgMediaId, 'custom-url');
+    safeWrite(STORAGE_KEYS.bgMediaUrl, normalized.src);
+    safeWrite(STORAGE_KEYS.bgMediaType, normalized.type);
+  };
+
+  const applyRobotBackgroundImage = (imageValue, options = {}) => {
+    const { persist = true, syncMedia = true } = options;
     const normalized = String(imageValue || '').trim() || defaultRobotBg;
     root.style.setProperty('--client-screen-bg-image', toCssUrl(normalized));
 
@@ -184,10 +322,87 @@
         safeWrite(STORAGE_KEYS.robotBg, normalized);
       }
     }
+
+    if (syncMedia) {
+      applyBackgroundMedia(
+        {
+          id: 'custom-url',
+          label: 'Robot Image',
+          type: 'image',
+          src: normalized,
+          poster: normalized,
+        },
+        { persist }
+      );
+    }
   };
 
   const savedRobotBg = safeRead(STORAGE_KEYS.robotBg, '');
-  applyRobotBackgroundImage(savedRobotBg || defaultRobotBg, { persist: false });
+  applyRobotBackgroundImage(savedRobotBg || defaultRobotBg, { persist: false, syncMedia: false });
+
+  const savedMediaId = safeRead(STORAGE_KEYS.bgMediaId, '');
+  const savedCustomMediaUrl = String(safeRead(STORAGE_KEYS.bgMediaUrl, '')).trim();
+  const savedCustomMediaType = safeRead(STORAGE_KEYS.bgMediaType, '');
+
+  if (savedMediaId === 'custom-url' && savedCustomMediaUrl) {
+    applyBackgroundMedia(
+      {
+        id: 'custom-url',
+        label: 'Custom URL',
+        type: savedCustomMediaType || normalizeMediaType('', savedCustomMediaUrl),
+        src: savedCustomMediaUrl,
+        poster: savedCustomMediaUrl,
+      },
+      { persist: false }
+    );
+  } else if (savedMediaId && mediaLibraryById.has(savedMediaId)) {
+    applyBackgroundMedia(mediaLibraryById.get(savedMediaId), { persist: false });
+  } else if (defaultMedia) {
+    applyBackgroundMedia(defaultMedia, { persist: false });
+  }
+
+  bgMediaButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = String(button.dataset.bgMediaChoice || '').trim();
+      const media = mediaLibraryById.get(id);
+      if (!media) {
+        return;
+      }
+      applyBackgroundMedia(media, { persist: true });
+    });
+  });
+
+  if (applyBgMediaUrlButton && bgMediaUrlInput) {
+    applyBgMediaUrlButton.addEventListener('click', () => {
+      const value = String(bgMediaUrlInput.value || '').trim();
+      if (!value) {
+        return;
+      }
+      applyBackgroundMedia(
+        {
+          id: 'custom-url',
+          label: 'Custom URL',
+          type: normalizeMediaType('', value),
+          src: value,
+          poster: value,
+        },
+        { persist: true }
+      );
+    });
+  }
+
+  if (resetBgMediaButton) {
+    resetBgMediaButton.addEventListener('click', () => {
+      const baseMedia = defaultMedia || {
+        id: 'custom-url',
+        label: 'Robot Default',
+        type: 'image',
+        src: defaultRobotBg,
+        poster: defaultRobotBg,
+      };
+      applyBackgroundMedia(baseMedia, { persist: true });
+    });
+  }
 
   if (applyBgButton && bgInput) {
     applyBgButton.addEventListener('click', () => {
