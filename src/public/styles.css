@@ -3,20 +3,20 @@
 :root {
   --text: #f6f1f3;
   --muted: #baa5ad;
-  --primary: var(--theme-primary, #ff3f52);
-  --primary-dark: var(--theme-secondary, #d0182f);
-  --secondary: var(--theme-secondary, #ff5e72);
-  --tertiary: var(--theme-tertiary, #ff9db7);
-  --accent-pink: var(--theme-accent-pink, #ff4f93);
+  --primary: var(--theme-primary, #ff445b);
+  --primary-dark: var(--theme-secondary, #ffc1c9);
+  --secondary: var(--theme-secondary, #ffc1c9);
+  --tertiary: var(--theme-tertiary, #f7f8ff);
+  --accent-pink: var(--theme-accent-pink, #ff6f85);
   --panel: rgba(18, 11, 15, 0.88);
   --panel-soft: rgba(24, 14, 20, 0.92);
   --border: color-mix(in srgb, var(--primary) 34%, transparent);
   --ok: #7cf7a8;
   --off: #fda4af;
   --warn: #ffc477;
-  --glow: var(--theme-glow, #ff6a7d);
-  --bg-start: var(--theme-bg-start, #060406);
-  --bg-end: var(--theme-bg-end, #1a070d);
+  --glow: var(--theme-glow, #ffe7eb);
+  --bg-start: var(--theme-bg-start, #09080c);
+  --bg-end: var(--theme-bg-end, #1a1117);
   --client-accent: #ef2f37;
   --client-accent-soft: #ff4a67;
   --client-accent-glow: #ff7897;
@@ -24,7 +24,7 @@
   --client-bg-b: #1a070d;
   --client-panel: rgba(17, 11, 16, 0.9);
   --client-border: rgba(239, 47, 55, 0.55);
-  --client-screen-bg-image: url('/assets/robot-preview-user.jpg');
+  --client-screen-bg-image: url('/assets/robots/robot-aurora.jpg');
   --client-bottom-shade-soft: rgba(239, 47, 55, 0.3);
   --client-bottom-shade: rgba(239, 47, 55, 0.7);
 }

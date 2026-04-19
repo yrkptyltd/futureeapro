@@ -32,7 +32,7 @@ const RED_THEME = {
   bgEnd: '#1d0c11',
   glow: '#ff7a7a',
 };
-const PREVIEW_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
+const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-aurora.jpg';
 const PREVIEW_ROBOT_NAME = 'Algo Nova EA V6';
 
 const SCENARIOS = [

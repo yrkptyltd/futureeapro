@@ -108,17 +108,24 @@ const METRADER_BROKERS = [
   'AvaTrade',
   'Other / Custom Broker',
 ];
+const DEFAULT_ROBOT_IMAGE_URLS = [
+  '/assets/robots/robot-aurora.jpg',
+  '/assets/robots/robot-cobalt.jpg',
+  '/assets/robots/robot-ember.jpg',
+  '/assets/robots/robot-orion.jpg',
+];
+const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
 const THEME_PRESETS = {
   dope_red: {
     label: 'Dope Red (Default)',
     colors: {
-      primary: '#ff5f6d',
-      secondary: '#ff9f43',
-      tertiary: '#9cff57',
-      accentPink: '#ff4f7b',
-      bgStart: '#0c0609',
-      bgEnd: '#1d0c11',
-      glow: '#ff7a7a',
+      primary: '#ff445b',
+      secondary: '#ffc1c9',
+      tertiary: '#f7f8ff',
+      accentPink: '#ff6f85',
+      bgStart: '#09080c',
+      bgEnd: '#1a1117',
+      glow: '#ffe7eb',
     },
   },
   neon_rose: {
@@ -170,6 +177,15 @@ const THEME_PRESETS = {
     },
   },
 };
+const LEGACY_DOPE_RED_THEME = {
+  primary: '#ff5f6d',
+  secondary: '#ff9f43',
+  tertiary: '#9cff57',
+  accentPink: '#ff4f7b',
+  bgStart: '#0c0609',
+  bgEnd: '#1d0c11',
+  glow: '#ff7a7a',
+};
 const LEGACY_INITIAL_THEME = {
   primary: '#ff3df5',
   secondary: '#39ff14',
@@ -205,6 +221,7 @@ ensureDataFile();
 ensureMentorPortalIds();
 ensureDefaultThemePalette();
 bootstrapSuperhost();
+migrateLegacyRobotImages();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -868,7 +885,8 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
     category: String(body.category || '').trim(),
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
-    imageUrl: String(body.imageUrl || '').trim(),
+    imageUrl:
+      String(body.imageUrl || '').trim() || pickDefaultRobotImage(`${req.currentUser.id}:${name}`),
     allowedSymbols: allowedSymbols.length ? allowedSymbols : QUOTE_SYMBOLS.slice(),
     keyStats: {
       uptimeHours: parseNumber(body.uptimeHours),
@@ -1304,7 +1322,8 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     category: String(body.category || '').trim(),
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
-    imageUrl: String(body.imageUrl || '').trim(),
+    imageUrl:
+      String(body.imageUrl || '').trim() || pickDefaultRobotImage(`${req.currentUser.id}:${name}`),
     allowedSymbols: parseSymbolsInput(body.allowedSymbols),
     keyStats: {
       uptimeHours: parseNumber(body.uptimeHours),
@@ -1456,13 +1475,13 @@ app.post('/superhost/theme', requireAuth, requireRole('superhost'), (req, res) =
   }
 
   const themeUpdates = {
-    primary: normalizeHexColor(body.primary, '#ff5f6d'),
-    secondary: normalizeHexColor(body.secondary, '#ff9f43'),
-    tertiary: normalizeHexColor(body.tertiary, '#9cff57'),
-    accentPink: normalizeHexColor(body.accentPink, '#ff4f7b'),
-    bgStart: normalizeHexColor(body.bgStart, '#0c0609'),
-    bgEnd: normalizeHexColor(body.bgEnd, '#1d0c11'),
-    glow: normalizeHexColor(body.glow, '#ff7a7a'),
+    primary: normalizeHexColor(body.primary, '#ff445b'),
+    secondary: normalizeHexColor(body.secondary, '#ffc1c9'),
+    tertiary: normalizeHexColor(body.tertiary, '#f7f8ff'),
+    accentPink: normalizeHexColor(body.accentPink, '#ff6f85'),
+    bgStart: normalizeHexColor(body.bgStart, '#09080c'),
+    bgEnd: normalizeHexColor(body.bgEnd, '#1a1117'),
+    glow: normalizeHexColor(body.glow, '#ffe7eb'),
   };
 
   updatePortalTheme(themeUpdates);
@@ -1889,9 +1908,48 @@ function ensureDefaultThemePalette() {
     return;
   }
 
-  if (isThemeMatch(currentTheme, LEGACY_INITIAL_THEME)) {
+  if (
+    isThemeMatch(currentTheme, LEGACY_INITIAL_THEME) ||
+    isThemeMatch(currentTheme, LEGACY_DOPE_RED_THEME)
+  ) {
     updatePortalTheme(THEME_PRESETS.dope_red.colors);
   }
+}
+
+function migrateLegacyRobotImages() {
+  const users = listUsers().filter(
+    (user) => user && (user.role === 'mentor' || user.role === 'superhost')
+  );
+
+  for (const user of users) {
+    const robots = listRobotsByMentor(user.id);
+    for (const robot of robots) {
+      const imageUrl = String(robot.imageUrl || '').trim();
+      if (imageUrl && imageUrl !== LEGACY_RED_ROBOT_IMAGE_URL) {
+        continue;
+      }
+
+      updateRobot(robot.id, {
+        imageUrl: pickDefaultRobotImage(robot.id || robot.name || user.id),
+      });
+    }
+  }
+}
+
+function pickDefaultRobotImage(seedValue) {
+  const pool = DEFAULT_ROBOT_IMAGE_URLS;
+  if (!pool.length) {
+    return LEGACY_RED_ROBOT_IMAGE_URL;
+  }
+
+  const seedText = String(seedValue || '');
+  let hash = 0;
+  for (let i = 0; i < seedText.length; i += 1) {
+    hash = (hash * 31 + seedText.charCodeAt(i)) % 2147483647;
+  }
+
+  const index = Math.abs(hash) % pool.length;
+  return pool[index];
 }
 
 function isThemeMatch(theme, referenceTheme) {

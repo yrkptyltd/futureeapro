@@ -10,13 +10,13 @@ const DATA_FILE = configuredDataFile
   : path.join(path.resolve(configuredDataDir || DEFAULT_DATA_DIR), 'db.json');
 const DATA_DIR = path.dirname(DATA_FILE);
 const DEFAULT_THEME = {
-  primary: '#ff5f6d',
-  secondary: '#ff9f43',
-  tertiary: '#9cff57',
-  accentPink: '#ff4f7b',
-  bgStart: '#0c0609',
-  bgEnd: '#1d0c11',
-  glow: '#ff7a7a',
+  primary: '#ff445b',
+  secondary: '#ffc1c9',
+  tertiary: '#f7f8ff',
+  accentPink: '#ff6f85',
+  bgStart: '#09080c',
+  bgEnd: '#1a1117',
+  glow: '#ffe7eb',
 };
 
 const EMPTY_DATA = {

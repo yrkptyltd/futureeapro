@@ -15,7 +15,7 @@
 
   const root = document.documentElement;
   const appRoot = document.querySelector('.client-app-root');
-  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/robot-preview-user.jpg');
+  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/robots/robot-aurora.jpg');
   const faceSelectors = Array.from(document.querySelectorAll('[data-face-style-select]'));
   const faceStyleButtons = Array.from(document.querySelectorAll('[data-face-style-choice]'));
 
