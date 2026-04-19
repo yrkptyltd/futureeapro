@@ -24,13 +24,13 @@ const PREVIEW_DIR = path.join(ROOT, 'previews', 'mobile');
 const PORT = Number(process.env.PREVIEW_PORT || 3107);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const RED_THEME = {
-  primary: '#ff5f6d',
-  secondary: '#ff9f43',
-  tertiary: '#9cff57',
-  accentPink: '#ff4f7b',
-  bgStart: '#0c0609',
-  bgEnd: '#1d0c11',
-  glow: '#ff7a7a',
+  primary: '#ff445b',
+  secondary: '#ffc1c9',
+  tertiary: '#f7f8ff',
+  accentPink: '#ff6f85',
+  bgStart: '#09080c',
+  bgEnd: '#1a1117',
+  glow: '#ffe7eb',
 };
 const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-aurora.jpg';
 const PREVIEW_ROBOT_NAME = 'Algo Nova EA V6';
