@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
 const nodemailer = require('nodemailer');
@@ -210,6 +211,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/previews', express.static(path.join(__dirname, '..', 'previews')));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'replace-this-session-secret',
@@ -789,6 +791,7 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res
     dashboardDateLabel: formatDashboardDate(now),
     forexEvents,
     currentSection,
+    mobilePreviews: getMobilePreviewCatalog(),
   });
 });
 
@@ -1225,6 +1228,7 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (re
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
     dashboardDateLabel: formatDashboardDate(now),
     forexEvents,
+    mobilePreviews: getMobilePreviewCatalog(),
   });
 });
 
@@ -1642,6 +1646,7 @@ function normalizeMentorDashboardSection(value) {
     'manage-eas',
     'generate-key',
     'forex-events',
+    'app-previews',
   ]);
 
   if (!allowed.has(normalized)) {
@@ -1666,6 +1671,7 @@ function normalizeSuperhostDashboardSection(value) {
     'my-robots',
     'forex-events',
     'portal-theme',
+    'app-previews',
   ]);
 
   if (!allowed.has(normalized)) {
@@ -2067,6 +2073,78 @@ function parseEmailSet(rawValue, fallbackEmails) {
   }
 
   return list;
+}
+
+function getMobilePreviewCatalog() {
+  const previewDir = path.join(__dirname, '..', 'previews', 'mobile');
+  let fileNames = [];
+
+  try {
+    fileNames = fs.readdirSync(previewDir);
+  } catch (_error) {
+    return {
+      all: [],
+      android: [],
+      ios: [],
+      other: [],
+    };
+  }
+
+  const records = fileNames
+    .filter((fileName) => /\.(png|jpg|jpeg|webp)$/i.test(fileName))
+    .map((fileName) => {
+      const extension = path.extname(fileName);
+      const id = path.basename(fileName, extension);
+      const lowerId = id.toLowerCase();
+      const parts = id.split('-');
+      const orderNumber = Number(parts[1]);
+      const order = Number.isFinite(orderNumber) ? orderNumber : 999;
+      const platform = lowerId.startsWith('android-')
+        ? 'android'
+        : lowerId.startsWith('ios-')
+          ? 'ios'
+          : 'other';
+      const titleSource = parts.length >= 3 ? parts.slice(2).join('-') : parts.slice(1).join('-');
+
+      return {
+        id,
+        fileName,
+        order,
+        platform,
+        title: formatPreviewTitle(titleSource || id),
+        url: `/previews/mobile/${encodeURIComponent(fileName)}`,
+      };
+    })
+    .sort((a, b) => {
+      if (a.platform !== b.platform) {
+        return a.platform.localeCompare(b.platform);
+      }
+      if (a.order !== b.order) {
+        return a.order - b.order;
+      }
+      return a.id.localeCompare(b.id);
+    });
+
+  return {
+    all: records,
+    android: records.filter((item) => item.platform === 'android'),
+    ios: records.filter((item) => item.platform === 'ios'),
+    other: records.filter((item) => item.platform === 'other'),
+  };
+}
+
+function formatPreviewTitle(value) {
+  const words = String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) {
+    return 'Preview';
+  }
+
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 function isClientSubscriptionBypassed(clientEmail) {

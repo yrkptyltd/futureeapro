@@ -1,0 +1,54 @@
+<section class="panel-grid single <%= activeSection === 'app-previews' ? '' : 'section-hidden' %>" id="app-previews">
+  <article class="panel">
+    <div class="panel-head-row">
+      <h2>App Previews</h2>
+      <span class="pill"><%= (mobilePreviews && mobilePreviews.all ? mobilePreviews.all.length : 0) %> screens</span>
+    </div>
+    <p class="hint">Use these live preview IDs when requesting changes (example: <code>android-05-robot-interface</code>).</p>
+
+    <% const previewItems = (mobilePreviews && mobilePreviews.all) ? mobilePreviews.all : []; %>
+    <% if (!previewItems.length) { %>
+    <p class="hint">No mobile previews found yet. Run preview generation, then refresh this section.</p>
+    <% } else { %>
+    <div class="preview-toolbar" data-preview-toolbar>
+      <div class="preview-filter-group" role="tablist" aria-label="Filter preview platform">
+        <button type="button" class="button mini secondary active" data-preview-filter="all">All</button>
+        <button type="button" class="button mini secondary" data-preview-filter="android">Android</button>
+        <button type="button" class="button mini secondary" data-preview-filter="ios">iOS</button>
+      </div>
+
+      <label class="preview-search-field">
+        <span class="sr-only">Search previews</span>
+        <input type="search" placeholder="Search by ID or screen name" data-preview-search />
+      </label>
+    </div>
+
+    <p class="hint preview-empty" data-preview-empty hidden>No previews match your filters.</p>
+
+    <div class="preview-gallery" data-preview-gallery>
+      <% previewItems.forEach((item) => { %>
+      <article
+        class="preview-card"
+        data-preview-card
+        data-platform="<%= item.platform %>"
+        data-preview-id="<%= String(item.id || '').toLowerCase() %>"
+        data-preview-title="<%= String(item.title || '').toLowerCase() %>"
+      >
+        <a href="<%= item.url %>" target="_blank" rel="noopener noreferrer" class="preview-image-link">
+          <img src="<%= item.url %>" alt="<%= item.title %> preview (<%= item.platform %>)" loading="lazy" />
+        </a>
+        <div class="preview-card-body">
+          <p class="preview-card-id"><code><%= item.id %></code></p>
+          <p class="hint"><%= item.title %></p>
+          <div class="preview-card-actions">
+            <span class="pill"><%= item.platform === 'ios' ? 'iOS' : item.platform === 'android' ? 'Android' : 'Other' %></span>
+            <button type="button" class="button mini secondary copy-key-btn" data-copy-value="<%= item.id %>">Copy ID</button>
+            <a href="<%= item.url %>" target="_blank" rel="noopener noreferrer" class="button mini">Open</a>
+          </div>
+        </div>
+      </article>
+      <% }) %>
+    </div>
+    <% } %>
+  </article>
+</section>
