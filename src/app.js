@@ -108,15 +108,20 @@ const METRADER_BROKERS = [
   'AvaTrade',
   'Other / Custom Broker',
 ];
-const DEFAULT_ROBOT_IMAGE_URLS = [
-  '/assets/robots/robot-aurora.jpg',
-  '/assets/robots/robot-cobalt.jpg',
-  '/assets/robots/robot-ember.jpg',
-  '/assets/robots/robot-orion.jpg',
-];
+const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.svg'];
 const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
 const LEGACY_ROBOT_NAME_PATTERN = /algo\s*nova\s*ea\s*v?6/i;
+const FORBIDDEN_ROBOT_IMAGE_PATTERNS = [
+  /robot-preview-user/i,
+  /b287272d-29f2-4670-9026-359dff57c5e6/i,
+  /img_4755/i,
+  /img_8085/i,
+  /img_8084/i,
+  /img_8083/i,
+  /algo[\s_-]*nova/i,
+  /trade[\s_-]*port/i,
+];
 const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
   {
     id: 'uploaded-video-01',
@@ -136,38 +141,22 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
   },
   {
     id: 'uploaded-image-01',
-    label: 'Uploaded Neon Frame',
+    label: 'Red Matrix Motion',
     type: 'image',
     src: '/assets/backgrounds/future-theme-upload-01.jpg',
     poster: '/assets/backgrounds/future-theme-upload-01.jpg',
-    themeHint: 'blue',
-  },
-  {
-    id: 'future-image-aurora',
-    label: 'Aurora Robot',
-    type: 'image',
-    src: '/assets/robots/robot-aurora.jpg',
-    poster: '/assets/robots/robot-aurora.jpg',
     themeHint: 'red',
   },
   {
-    id: 'future-image-orion',
-    label: 'Orion Robot',
+    id: 'uploaded-image-02',
+    label: 'Cortex Reference',
     type: 'image',
-    src: '/assets/robots/robot-orion.jpg',
-    poster: '/assets/robots/robot-orion.jpg',
-    themeHint: 'cyan',
-  },
-  {
-    id: 'future-image-ember',
-    label: 'Ember Robot',
-    type: 'image',
-    src: '/assets/robots/robot-ember.jpg',
-    poster: '/assets/robots/robot-ember.jpg',
-    themeHint: 'orange',
+    src: '/assets/backgrounds/future-theme-style-reference.jpg',
+    poster: '/assets/backgrounds/future-theme-style-reference.jpg',
+    themeHint: 'green',
   },
 ];
-const CLIENT_DEFAULT_BACKGROUND_MEDIA_ID = 'uploaded-image-01';
+const CLIENT_DEFAULT_BACKGROUND_MEDIA_ID = 'uploaded-video-01';
 const THEME_PRESETS = {
   dope_red: {
     label: 'Dope Red (Default)',
@@ -248,6 +237,12 @@ const LEGACY_INITIAL_THEME = {
   bgEnd: '#2a0038',
   glow: '#ff5eea',
 };
+const ANDROID_TEST_APK_PATH = path.join(
+  __dirname,
+  'public',
+  'downloads',
+  'future-ea-pro-android-beta.apk'
+);
 let cachedLicenseEmailTransporter = null;
 const FOREX_EVENTS_FEED_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
 const FOREX_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -429,7 +424,16 @@ app.get('/client', (_req, res) => {
 });
 
 app.get('/download/android', (_req, res) => {
-  return res.redirect('/client');
+  if (!fs.existsSync(ANDROID_TEST_APK_PATH)) {
+    return res.redirect('/client');
+  }
+  return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
+});
+
+app.get('/download/ios', (_req, res) => {
+  return res.render('download-ios', {
+    title: 'Install iOS App',
+  });
 });
 
 app.post('/client/start', (req, res) => {
@@ -499,7 +503,7 @@ app.get('/client/subscription', (req, res) => {
 
   const mentor = getUserById(flow.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickFeaturedRobot(mentorRobots);
+  const featuredRobot = pickFeaturedRobot(mentorRobots, mentor ? mentor.id : flow.mentorId);
 
   return res.render('client-subscription', {
     title: 'Choose Subscription',
@@ -560,7 +564,7 @@ app.get('/client/unlock', (req, res) => {
 
   const mentor = getUserById(flow.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickFeaturedRobot(mentorRobots);
+  const featuredRobot = pickFeaturedRobot(mentorRobots, mentor ? mentor.id : flow.mentorId);
   const plan = getClientPlan(flow.planCode);
 
   return res.render('client-unlock', {
@@ -671,7 +675,11 @@ app.get('/client/success/:subscriptionId', (req, res) => {
   const mentor = getUserById(subscription.mentorId);
   const plan = getClientPlan(subscription.planCode);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
   return res.render('client-success', {
     title: 'Subscription Complete',
     subscription,
@@ -695,7 +703,11 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
 
   const mentor = getUserById(subscription.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
   const plan = getClientPlan(subscription.planCode);
   const requestedSection = String(req.query.section || 'home').trim().toLowerCase();
   const activeSection = CLIENT_ROBOT_SECTIONS.includes(requestedSection) ? requestedSection : 'home';
@@ -741,7 +753,11 @@ app.post('/client/robot/:subscriptionId/symbols/allowed', (req, res) => {
 
   const mentor = getUserById(subscription.mentorId);
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
-  const featuredRobot = pickSubscriptionRobot(subscription, mentorRobots);
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
   const symbols = getMentorAvailableSymbols(featuredRobot);
   const validSymbolSet = new Set(symbols);
   const rawSymbols = req.body && req.body.symbols;
@@ -935,6 +951,10 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
     return Number.isFinite(parsed) ? parsed : fallback;
   };
   const allowedSymbols = parseSymbolsInput(body.allowedSymbols);
+  const requestedImageUrl = String(body.imageUrl || '').trim();
+  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
+    ? pickDefaultRobotImage(`${req.currentUser.id}:${name}`)
+    : requestedImageUrl || pickDefaultRobotImage(`${req.currentUser.id}:${name}`);
 
   createRobot({
     mentorId: req.currentUser.id,
@@ -943,8 +963,7 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
     category: String(body.category || '').trim(),
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
-    imageUrl:
-      String(body.imageUrl || '').trim() || pickDefaultRobotImage(`${req.currentUser.id}:${name}`),
+    imageUrl,
     allowedSymbols: allowedSymbols.length ? allowedSymbols : QUOTE_SYMBOLS.slice(),
     keyStats: {
       uptimeHours: parseNumber(body.uptimeHours),
@@ -1375,6 +1394,10 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   };
+  const requestedImageUrl = String(body.imageUrl || '').trim();
+  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
+    ? pickDefaultRobotImage(`${req.currentUser.id}:${name}`)
+    : requestedImageUrl || pickDefaultRobotImage(`${req.currentUser.id}:${name}`);
 
   createRobot({
     mentorId: req.currentUser.id,
@@ -1383,8 +1406,7 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     category: String(body.category || '').trim(),
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
-    imageUrl:
-      String(body.imageUrl || '').trim() || pickDefaultRobotImage(`${req.currentUser.id}:${name}`),
+    imageUrl,
     allowedSymbols: parseSymbolsInput(body.allowedSymbols),
     keyStats: {
       uptimeHours: parseNumber(body.uptimeHours),
@@ -1988,7 +2010,8 @@ function migrateLegacyRobotImages() {
     const robots = listRobotsByMentor(user.id);
     for (const robot of robots) {
       const imageUrl = String(robot.imageUrl || '').trim();
-      if (imageUrl && imageUrl !== LEGACY_RED_ROBOT_IMAGE_URL) {
+      const hasLegacyName = LEGACY_ROBOT_NAME_PATTERN.test(String(robot.name || '').trim());
+      if (imageUrl && !shouldReplaceLegacyRobotImage(imageUrl) && !hasLegacyName) {
         continue;
       }
 
@@ -2057,7 +2080,7 @@ function sanitizeRobotName(inputName) {
 function pickDefaultRobotImage(seedValue) {
   const pool = DEFAULT_ROBOT_IMAGE_URLS;
   if (!pool.length) {
-    return '/assets/robots/robot-aurora.jpg';
+    return '/assets/future-ea-pro-logo.svg';
   }
 
   const seedText = String(seedValue || '');
@@ -2068,6 +2091,19 @@ function pickDefaultRobotImage(seedValue) {
 
   const index = Math.abs(hash) % pool.length;
   return pool[index];
+}
+
+function shouldReplaceLegacyRobotImage(imageUrlValue) {
+  const normalized = String(imageUrlValue || '').trim();
+  if (!normalized) {
+    return true;
+  }
+
+  if (normalized === LEGACY_RED_ROBOT_IMAGE_URL) {
+    return true;
+  }
+
+  return FORBIDDEN_ROBOT_IMAGE_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 function isThemeMatch(theme, referenceTheme) {
@@ -2391,20 +2427,23 @@ function isSubscriptionActiveNow(subscription, now) {
   return endDate >= now;
 }
 
-function pickFeaturedRobot(robots) {
+function pickFeaturedRobot(robots, fallbackSeed = '') {
   if (!Array.isArray(robots) || !robots.length) {
     return null;
   }
 
-  const withImage = robots.find((robot) => robot.imageUrl);
-  if (withImage) {
-    return withImage;
-  }
+  const preferred = robots.find((robot) => {
+    if (!robot) {
+      return false;
+    }
+    const imageUrl = String(robot.imageUrl || '').trim();
+    return imageUrl && !shouldReplaceLegacyRobotImage(imageUrl);
+  });
 
-  return robots[0];
+  return sanitizeRobotForClientDisplay(preferred || robots[0], fallbackSeed);
 }
 
-function pickSubscriptionRobot(subscription, robots) {
+function pickSubscriptionRobot(subscription, robots, fallbackSeed = '') {
   if (!Array.isArray(robots) || !robots.length) {
     return null;
   }
@@ -2413,11 +2452,30 @@ function pickSubscriptionRobot(subscription, robots) {
   if (preferredId) {
     const preferredRobot = robots.find((item) => item.id === preferredId);
     if (preferredRobot) {
-      return preferredRobot;
+      return sanitizeRobotForClientDisplay(preferredRobot, subscription && subscription.mentorId);
     }
   }
 
-  return pickFeaturedRobot(robots);
+  return pickFeaturedRobot(robots, fallbackSeed || (subscription && subscription.mentorId));
+}
+
+function sanitizeRobotForClientDisplay(robot, fallbackSeed = '') {
+  if (!robot) {
+    return null;
+  }
+
+  const safeName = sanitizeRobotName(robot.name);
+  const requestedImageUrl = String(robot.imageUrl || '').trim();
+  const imageSeed = robot.id || safeName || fallbackSeed || 'future-ea-pro';
+  const safeImageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
+    ? pickDefaultRobotImage(imageSeed)
+    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+
+  return {
+    ...robot,
+    name: safeName,
+    imageUrl: safeImageUrl,
+  };
 }
 
 function getLicenseEmailTransporter() {

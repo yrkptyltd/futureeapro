@@ -24,7 +24,7 @@
   --client-bg-b: #1a070d;
   --client-panel: rgba(17, 11, 16, 0.9);
   --client-border: rgba(239, 47, 55, 0.55);
-  --client-screen-bg-image: url('/assets/robots/robot-aurora.jpg');
+  --client-screen-bg-image: url('/assets/future-ea-pro-logo.svg');
   --client-bottom-shade-soft: rgba(239, 47, 55, 0.3);
   --client-bottom-shade: rgba(239, 47, 55, 0.7);
 }
@@ -2534,6 +2534,11 @@ code {
 
 .client-bg-image {
   opacity: 0.52;
+  transform-origin: center center;
+}
+
+:root[data-bg-media-type='image'] .client-bg-image {
+  animation: bgImageMotion 18s ease-in-out infinite alternate;
 }
 
 .client-media-overlay {
@@ -2550,6 +2555,17 @@ code {
   background:
     radial-gradient(circle at center, transparent 42%, rgba(4, 4, 6, 0.35) 100%),
     linear-gradient(180deg, transparent 54%, rgba(2, 2, 4, 0.76) 100%);
+}
+
+@keyframes bgImageMotion {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+    filter: saturate(1.06) contrast(1.02);
+  }
+  to {
+    transform: scale(1.11) translate3d(0, -2.5%, 0);
+    filter: saturate(1.12) contrast(1.08);
+  }
 }
 
 .client-menu-toggle {
@@ -2643,9 +2659,11 @@ code {
 .home-hero-card {
   position: relative;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 24px;
   border: 1px solid color-mix(in srgb, var(--client-accent) 54%, transparent);
-  box-shadow: 0 0 22px color-mix(in srgb, var(--client-accent) 24%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 8%, transparent) inset,
+    0 0 24px color-mix(in srgb, var(--client-accent) 26%, transparent);
 }
 
 .home-hero-card::after {
@@ -2657,6 +2675,51 @@ code {
   height: 40%;
   background: linear-gradient(180deg, rgba(5, 3, 6, 0), rgba(5, 3, 6, 0.82));
   pointer-events: none;
+}
+
+.home-profile-pill {
+  margin: 0 auto -48px;
+  width: min(86%, 320px);
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem 0.34rem 0.34rem;
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  position: relative;
+  z-index: 8;
+  border: 1px solid color-mix(in srgb, var(--client-accent-soft) 66%, transparent);
+  background:
+    linear-gradient(145deg, rgba(33, 19, 23, 0.88), rgba(23, 15, 19, 0.9)),
+    radial-gradient(circle at 8% 50%, color-mix(in srgb, var(--client-accent) 28%, transparent), transparent 54%);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.35),
+    0 0 18px color-mix(in srgb, var(--client-accent-glow) 26%, transparent);
+}
+
+.home-profile-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--client-accent-soft) 70%, transparent);
+}
+
+.home-profile-name {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.home-profile-state {
+  margin: 0.08rem 0 0;
+  color: color-mix(in srgb, var(--client-accent-soft) 84%, #c9f5de);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.62rem;
+  font-weight: 700;
 }
 
 .home-hero-image {
@@ -2686,7 +2749,7 @@ code {
 .home-action-panel {
   border: 1px solid color-mix(in srgb, var(--client-accent) 48%, transparent);
   border-radius: 22px;
-  padding: 0.62rem;
+  padding: 0.7rem;
   margin-top: -34px;
   position: relative;
   z-index: 6;
@@ -2709,12 +2772,8 @@ code {
 
 .home-action-btn {
   appearance: none;
-  border: 1px solid color-mix(in srgb, var(--client-accent) 46%, transparent);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #ffffff 7%, rgba(8, 6, 9, 0.84)),
-    rgba(9, 7, 10, 0.84)
-  );
+  border: 0;
+  background: transparent;
   color: #ffeef3;
   display: flex;
   flex-direction: column;
@@ -2722,25 +2781,21 @@ code {
   justify-items: center;
   align-content: center;
   align-items: center;
-  min-height: 94px;
-  padding: 0.55rem 0.3rem 0.45rem;
-  border-radius: 16px;
+  min-height: 90px;
+  padding: 0.22rem 0.3rem 0.4rem;
+  border-radius: 14px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 700;
   font-size: 0.68rem;
-  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease, filter 150ms ease;
 }
 
 .home-action-btn:hover,
 .home-action-btn:focus-visible {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--client-accent-soft) 74%, transparent);
-  box-shadow:
-    0 12px 24px rgba(0, 0, 0, 0.34),
-    0 0 16px color-mix(in srgb, var(--client-accent-glow) 22%, transparent);
+  transform: translateY(-1px);
+  filter: brightness(1.08);
 }
 
 .action-label {
@@ -2750,9 +2805,9 @@ code {
 .action-icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 42px;
-  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--client-accent) 52%, transparent);
   background: color-mix(in srgb, var(--client-accent) 14%, rgba(8, 7, 10, 0.72));
   color: #fff0f5;
@@ -2762,19 +2817,39 @@ code {
     0 0 0 1px color-mix(in srgb, #fff 8%, transparent) inset;
 }
 
-.action-trade-btn .action-icon {
-  background: color-mix(in srgb, var(--client-accent) 30%, rgba(8, 7, 10, 0.72));
-  color: #fff5f8;
+.action-main-btn {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #ffffff 8%, rgba(14, 10, 13, 0.88)),
+    rgba(11, 9, 12, 0.9)
+  );
+  border: 1px solid color-mix(in srgb, var(--client-accent) 48%, transparent);
+  border-radius: 16px;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--client-accent-soft) 34%, transparent),
-    0 0 18px color-mix(in srgb, var(--client-accent-glow) 34%, transparent);
+    0 10px 18px rgba(0, 0, 0, 0.32),
+    0 0 18px color-mix(in srgb, var(--client-accent) 22%, transparent);
+}
+
+.action-icon.action-icon-main {
+  width: 64px;
+  height: 64px;
+  font-size: 1.2rem;
+  background: color-mix(in srgb, var(--client-accent) 26%, rgba(8, 7, 10, 0.72));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--client-accent-soft) 40%, transparent),
+    0 0 20px color-mix(in srgb, var(--client-accent-glow) 36%, transparent);
 }
 
 .powered-by {
-  margin: 0;
+  margin: 0 auto;
+  width: fit-content;
   text-align: center;
-  color: #b9a3ac;
-  font-size: 0.87rem;
+  color: #c6bbc2;
+  font-size: 0.86rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--client-accent) 28%, transparent);
+  background: rgba(10, 8, 11, 0.72);
+  padding: 0.26rem 0.78rem;
 }
 
 .powered-by strong {
@@ -2832,6 +2907,11 @@ code {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 0.76rem;
+}
+
+.home-list-sub.running {
+  color: #63f19a;
+  letter-spacing: 0.12em;
 }
 
 .home-card-badge-avatar {

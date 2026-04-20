@@ -32,7 +32,7 @@ const RED_THEME = {
   bgEnd: '#1a1117',
   glow: '#ffe7eb',
 };
-const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-orion.jpg';
+const PREVIEW_ROBOT_IMAGE_URL = '/assets/robots/robot-ember.jpg';
 const PREVIEW_ROBOT_NAME = 'Future EA Pro Sentinel';
 
 const SCENARIOS = [
@@ -71,7 +71,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'v4',
     bottomShade: 'blue',
-    backgroundMediaId: 'future-image-orion',
+    backgroundMediaId: 'uploaded-image-02',
   },
   {
     slug: 'custom-superpill',
@@ -100,7 +100,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'off',
     bottomShade: 'custom',
-    backgroundMediaId: 'future-image-ember',
+    backgroundMediaId: 'uploaded-image-02',
     customShade: {
       hue: 104,
       sat: 0.92,
@@ -126,7 +126,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'frame',
     bgStyle: 'v4',
     bottomShade: 'custom',
-    backgroundMediaId: 'future-image-aurora',
+    backgroundMediaId: 'uploaded-image-01',
     customShade: {
       hue: 322,
       sat: 0.88,
@@ -152,7 +152,7 @@ const STYLE_VARIANTS = [
     faceStyle: 'super-pill',
     bgStyle: 'off',
     bottomShade: 'custom',
-    backgroundMediaId: 'future-image-orion',
+    backgroundMediaId: 'uploaded-video-01',
     customShade: {
       hue: 218,
       sat: 0.9,

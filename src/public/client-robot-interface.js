@@ -117,6 +117,13 @@
   const panel = document.getElementById('robot-floating-panel');
   const closeButton = document.getElementById('robot-floating-close');
   const statusPill = document.getElementById('robot-status-pill');
+  const mainActionButton = document.querySelector('[data-main-robot-action]');
+  const mainActionIcon = document.querySelector('[data-main-robot-icon]');
+  const mainActionLabel = document.querySelector('[data-main-robot-label]');
+  const runningCopyNodes = Array.from(document.querySelectorAll('[data-robot-running-copy]'));
+  const runningStatusRows = Array.from(
+    document.querySelectorAll('.home-list-sub[data-robot-running-copy]')
+  );
 
   if (!launcher || !panel || !statusPill) {
     return;
@@ -126,8 +133,12 @@
   const STATUS_KEY = 'futureeapro.client.robotStatus';
   const currentSection = new URLSearchParams(window.location.search).get('section') || 'home';
   const allowFloating = currentSection === 'home' || currentSection === 'trade';
-  const startButtons = Array.from(document.querySelectorAll('[data-action="start-robot"]'));
-  const pauseButtons = Array.from(document.querySelectorAll('[data-action="pause-robot"]'));
+  const startButtons = Array.from(document.querySelectorAll('[data-action="start-robot"]')).filter(
+    (button) => button !== mainActionButton
+  );
+  const pauseButtons = Array.from(document.querySelectorAll('[data-action="pause-robot"]')).filter(
+    (button) => button !== mainActionButton
+  );
   const removeButtons = Array.from(document.querySelectorAll('[data-action="remove-robot"]'));
 
   const safeRead = (key, fallback) => {
@@ -156,12 +167,57 @@
     safeWrite(VISIBILITY_KEY, isVisible ? '1' : '0');
   };
 
+  const setMainActionMode = (statusValue) => {
+    if (!mainActionButton) {
+      return;
+    }
+    const isActive = statusValue === 'active';
+    mainActionButton.dataset.action = isActive ? 'pause-robot' : 'start-robot';
+    if (mainActionLabel) {
+      mainActionLabel.textContent = isActive ? 'Stop' : 'Start';
+    }
+    if (mainActionIcon) {
+      mainActionIcon.textContent = isActive ? '■' : '▶';
+    }
+  };
+
+  const setRunningCopy = (statusValue) => {
+    const isActive = statusValue === 'active';
+    const nextText = isActive ? 'Running' : 'Paused';
+    const profileText = isActive ? 'Active' : 'Paused';
+
+    runningCopyNodes.forEach((node, index) => {
+      if (!node) {
+        return;
+      }
+      node.textContent = index === 0 ? profileText : nextText;
+    });
+
+    runningStatusRows.forEach((row) => {
+      row.classList.toggle('running', isActive);
+    });
+  };
+
   const setStatus = (statusValue) => {
     const normalized = statusValue === 'paused' ? 'paused' : 'active';
     statusPill.textContent = normalized === 'active' ? 'Active' : 'Paused';
     statusPill.classList.remove('active', 'paused');
     statusPill.classList.add(normalized);
+    setMainActionMode(normalized);
+    setRunningCopy(normalized);
     safeWrite(STATUS_KEY, normalized);
+  };
+
+  const startRobot = () => {
+    setVisible(true);
+    setStatus('active');
+    panel.classList.remove('is-hidden');
+  };
+
+  const pauseRobot = () => {
+    setVisible(true);
+    setStatus('paused');
+    panel.classList.remove('is-hidden');
   };
 
   setVisible(safeRead(VISIBILITY_KEY, '0') === '1');
@@ -169,17 +225,24 @@
 
   for (const button of startButtons) {
     button.addEventListener('click', () => {
-      setVisible(true);
-      setStatus('active');
-      panel.classList.remove('is-hidden');
+      startRobot();
     });
   }
 
   for (const button of pauseButtons) {
     button.addEventListener('click', () => {
-      setVisible(true);
-      setStatus('paused');
-      panel.classList.remove('is-hidden');
+      pauseRobot();
+    });
+  }
+
+  if (mainActionButton) {
+    mainActionButton.addEventListener('click', () => {
+      const action = String(mainActionButton.dataset.action || '').trim();
+      if (action === 'start-robot') {
+        startRobot();
+        return;
+      }
+      pauseRobot();
     });
   }
 

@@ -11,7 +11,7 @@
   };
   const activeLabel = sectionLabels[activeSection] || 'Home';
   const robotName = featuredRobot ? featuredRobot.name : (defaultRobotName || 'Future EA Pro Core');
-  const robotImage = (featuredRobot && featuredRobot.imageUrl) ? featuredRobot.imageUrl : '/assets/robots/robot-aurora.jpg';
+  const robotImage = (featuredRobot && featuredRobot.imageUrl) ? featuredRobot.imageUrl : '/assets/future-ea-pro-logo.svg';
   const mediaLibrary = Array.isArray(backgroundMediaLibrary) ? backgroundMediaLibrary : [];
   const defaultMediaId = defaultBackgroundMediaId || (mediaLibrary.length ? mediaLibrary[0].id : '');
 %>
@@ -71,6 +71,14 @@
   <div class="client-screen-wrap">
     <% if (activeSection === 'home') { %>
     <section class="client-screen client-home-screen">
+      <article class="home-profile-pill">
+        <img src="<%= robotImage %>" alt="<%= robotName %> avatar" class="home-profile-avatar" />
+        <div>
+          <p class="home-profile-name"><%= robotName %></p>
+          <p class="home-profile-state" data-robot-running-copy>Active</p>
+        </div>
+      </article>
+
       <article class="home-hero-card client-face-card">
         <img src="<%= robotImage %>" alt="<%= robotName %>" class="home-hero-image robot-preview-feature" />
         <p class="home-hero-title"><%= robotName %></p>
@@ -81,9 +89,9 @@
           <span class="action-icon">↗</span>
           <span class="action-label">Quotes</span>
         </button>
-        <button type="button" class="home-action-btn action-trade-btn" data-go-section="trade">
-          <span class="action-icon">▶</span>
-          <span class="action-label">Trade</span>
+        <button type="button" class="home-action-btn action-main-btn" data-action="pause-robot" data-main-robot-action>
+          <span class="action-icon action-icon-main" data-main-robot-icon>■</span>
+          <span class="action-label" data-main-robot-label>Stop</span>
         </button>
         <button type="button" class="home-action-btn" data-action="remove-robot">
           <span class="action-icon">⌫</span>
@@ -97,7 +105,7 @@
         <img src="<%= robotImage %>" alt="<%= robotName %> icon" class="home-list-avatar" />
         <div>
           <p class="home-list-title"><%= robotName %></p>
-          <p class="home-list-sub">IDLE</p>
+          <p class="home-list-sub running" data-robot-running-copy>Running</p>
         </div>
       </article>
 
@@ -359,6 +367,9 @@
           <button type="button" class="theme-chip" data-client-theme-choice="orange">Orange</button>
           <button type="button" class="theme-chip" data-client-theme-choice="cyan">Cyan</button>
           <button type="button" class="theme-chip" data-client-theme-choice="blue">Blue</button>
+        </div>
+        <div class="cta-row">
+          <button type="button" class="button mini" data-action="auto-match-theme">Auto Match To Robot Pic</button>
         </div>
       </article>
 

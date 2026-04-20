@@ -18,7 +18,7 @@
 
   const root = document.documentElement;
   const appRoot = document.querySelector('.client-app-root');
-  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/robots/robot-aurora.jpg');
+  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/future-ea-pro-logo.svg');
   const defaultMediaId = String(appRoot?.dataset.defaultMediaId || '').trim();
   const faceSelectors = Array.from(document.querySelectorAll('[data-face-style-select]'));
   const faceStyleButtons = Array.from(document.querySelectorAll('[data-face-style-choice]'));
@@ -29,6 +29,7 @@
   const bgMediaUrlInput = document.querySelector('[data-bg-media-url-input]');
   const applyBgMediaUrlButton = document.querySelector('[data-action="apply-background-media-url"]');
   const resetBgMediaButton = document.querySelector('[data-action="reset-background-media"]');
+  const autoMatchThemeButton = document.querySelector('[data-action="auto-match-theme"]');
 
   const SETTINGS = [
     {
@@ -149,6 +150,7 @@
       type: normalizeMediaType(item.type, src),
       src,
       poster: String(item.poster || '').trim() || src,
+      themeHint: String(item.themeHint || '').trim().toLowerCase(),
     };
   };
 
@@ -289,6 +291,11 @@
     }
 
     setActiveBackgroundChoice(normalized.id);
+
+    const themeConfig = settingByAttribute['data-client-theme'];
+    if (themeConfig && normalized.themeHint && themeConfig.valid.has(normalized.themeHint)) {
+      applySetting(themeConfig, normalized.themeHint, { persist });
+    }
 
     if (!persist) {
       return;
@@ -498,6 +505,56 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
+  const rgbToHsv = ({ r, g, b }) => {
+    const red = r / 255;
+    const green = g / 255;
+    const blue = b / 255;
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    let hue = 0;
+
+    if (delta !== 0) {
+      if (max === red) {
+        hue = ((green - blue) / delta) % 6;
+      } else if (max === green) {
+        hue = (blue - red) / delta + 2;
+      } else {
+        hue = (red - green) / delta + 4;
+      }
+      hue *= 60;
+      if (hue < 0) {
+        hue += 360;
+      }
+    }
+
+    const sat = max === 0 ? 0 : delta / max;
+    const val = max;
+    return { h: hue, s: sat, v: val };
+  };
+
+  const pickThemeByHue = (hue) => {
+    if (hue >= 330 || hue < 15) {
+      return 'red';
+    }
+    if (hue < 35) {
+      return 'orange';
+    }
+    if (hue < 85) {
+      return 'green';
+    }
+    if (hue < 165) {
+      return 'cyan';
+    }
+    if (hue < 250) {
+      return 'blue';
+    }
+    if (hue < 300) {
+      return 'purple';
+    }
+    return 'pink';
+  };
+
   const customShadeState = {
     h: clamp(Number.parseFloat(safeRead(STORAGE_KEYS.customShadeHue, '0')) || 0, 0, 360),
     s: clamp(Number.parseFloat(safeRead(STORAGE_KEYS.customShadeSat, '0.72')) || 0.72, 0, 1),
@@ -618,6 +675,83 @@
   if (applyCustomShadeButton) {
     applyCustomShadeButton.addEventListener('click', () => {
       applyCustomShade(true);
+    });
+  }
+
+  const applyAutoMatchFromRobotImage = async () => {
+    const sourceImage =
+      document.querySelector('.home-hero-image') ||
+      document.querySelector('.home-profile-avatar') ||
+      bgImage;
+    const sourceUrl = String(sourceImage?.currentSrc || sourceImage?.src || '').trim();
+    if (!sourceUrl) {
+      return;
+    }
+
+    const probeImage = new Image();
+    probeImage.crossOrigin = 'anonymous';
+    probeImage.src = sourceUrl;
+
+    await new Promise((resolve, reject) => {
+      probeImage.onload = () => resolve();
+      probeImage.onerror = () => reject(new Error('Cannot read robot image'));
+    });
+
+    const canvas = document.createElement('canvas');
+    const size = 28;
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return;
+    }
+
+    context.drawImage(probeImage, 0, 0, size, size);
+    const pixels = context.getImageData(0, 0, size, size).data;
+
+    let redTotal = 0;
+    let greenTotal = 0;
+    let blueTotal = 0;
+    let count = 0;
+
+    for (let i = 0; i < pixels.length; i += 4) {
+      const alpha = pixels[i + 3] / 255;
+      if (alpha < 0.2) {
+        continue;
+      }
+      redTotal += pixels[i];
+      greenTotal += pixels[i + 1];
+      blueTotal += pixels[i + 2];
+      count += 1;
+    }
+
+    if (!count) {
+      return;
+    }
+
+    const avgRgb = {
+      r: Math.round(redTotal / count),
+      g: Math.round(greenTotal / count),
+      b: Math.round(blueTotal / count),
+    };
+    const hsv = rgbToHsv(avgRgb);
+    customShadeState.h = hsv.h;
+    customShadeState.s = clamp(hsv.s, 0.38, 0.96);
+    customShadeState.v = clamp(hsv.v, 0.44, 0.98);
+    renderShadePicker();
+    applyCustomShade(true);
+
+    const themeConfig = settingByAttribute['data-client-theme'];
+    if (themeConfig) {
+      applySetting(themeConfig, pickThemeByHue(hsv.h), { persist: true });
+    }
+  };
+
+  if (autoMatchThemeButton) {
+    autoMatchThemeButton.addEventListener('click', () => {
+      applyAutoMatchFromRobotImage().catch(() => {
+        // Ignore matching errors for cross-origin sources.
+      });
     });
   }
 })();
