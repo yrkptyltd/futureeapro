@@ -1029,6 +1029,8 @@ app.get('/client/subscription', (req, res) => {
     flow,
     plans: CLIENT_PLAN_LIST,
     featuredRobot,
+    funnelBackgroundImage:
+      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.svg',
   });
 });
 
@@ -1091,6 +1093,8 @@ app.get('/client/unlock', (req, res) => {
     flow,
     plan,
     featuredRobot,
+    funnelBackgroundImage:
+      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.svg',
     deviceId: getRequestDeviceId(req, req.session.clientDeviceId || ''),
   });
 });

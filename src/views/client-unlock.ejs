@@ -1,6 +1,9 @@
 <%- include('partials/top', { title: title }) %>
 
-<section class="client-flow-screen">
+<section
+  class="client-flow-screen single center-landing client-funnel-stage"
+  style="--funnel-robot-bg-image: url('<%= String(funnelBackgroundImage || '/assets/future-ea-pro-logo.svg').replace(/'/g, '%27') %>');"
+>
   <article class="client-flow-card">
     <div class="client-flow-stepper" aria-hidden="true">
       <span>Identity</span>
@@ -25,23 +28,6 @@
         <button type="submit" class="button client-flow-button">Unlock Robot</button>
       </form>
     </div>
-  </article>
-
-  <article class="client-flow-card client-flow-preview">
-    <h2>Robot Preview</h2>
-    <% if (featuredRobot && featuredRobot.imageUrl) { %>
-      <img
-        src="<%= featuredRobot.imageUrl %>"
-        alt="<%= featuredRobot.name %> preview"
-        class="robot-preview-lg robot-preview-feature"
-      />
-      <p><strong><%= featuredRobot.name %></strong></p>
-    <% } else if (featuredRobot) { %>
-      <p><strong><%= featuredRobot.name %></strong></p>
-      <p class="hint">Robot image not uploaded yet.</p>
-    <% } else { %>
-      <p class="hint">No robot profile is available yet for this mentor.</p>
-    <% } %>
   </article>
 </section>
 

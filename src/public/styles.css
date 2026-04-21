@@ -390,9 +390,39 @@ body::before {
 
 .client-funnel-page {
   background:
-    radial-gradient(circle at 14% 12%, rgba(255, 112, 141, 0.2), transparent 38%),
-    radial-gradient(circle at 86% 10%, rgba(106, 214, 255, 0.15), transparent 33%),
+    radial-gradient(circle at 14% 12%, rgba(255, 112, 141, 0.08), transparent 40%),
+    radial-gradient(circle at 86% 10%, rgba(106, 214, 255, 0.06), transparent 35%),
     linear-gradient(180deg, #07090f 0%, #080c17 44%, #070911 100%);
+}
+
+.client-funnel-stage {
+  position: relative;
+  isolation: isolate;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.client-funnel-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--funnel-robot-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.2;
+  filter: saturate(0.82) brightness(0.42);
+  transform: scale(1.05);
+}
+
+.client-funnel-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(6, 8, 14, 0.78) 0%, rgba(5, 7, 12, 0.88) 52%, rgba(4, 6, 11, 0.94) 100%),
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.05), transparent 44%);
 }
 
 .container.container-client-funnel {
