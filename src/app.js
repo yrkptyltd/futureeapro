@@ -66,6 +66,9 @@ const DEFAULT_TEST_MENTOR_LICENSE_LIMIT = 1000;
 const DEFAULT_TEST_CLIENT_EMAIL = normalizeEmail(
   process.env.DEFAULT_TEST_CLIENT_EMAIL || 'nhlanhlamashapa11@gmail.com'
 );
+const DEFAULT_TEST_LICENSE_KEY = normalizeLicenseInput(
+  process.env.DEFAULT_TEST_LICENSE_KEY || 'FUTR3EA1'
+);
 const DEFAULT_TEST_ROBOT_NAME = 'Future EA Pro Core';
 const parsedUsdExchangeRate = Number(process.env.USD_EXCHANGE_RATE || 18.5);
 const USD_EXCHANGE_RATE =
@@ -3019,8 +3022,11 @@ function bootstrapDefaultBypassLicenseKey() {
     return;
   }
 
+  const preferredLicenseKey = normalizeLicenseInput(DEFAULT_TEST_LICENSE_KEY);
+  const isPreferredKeyValid = /^[A-Z0-9]{8}$/.test(preferredLicenseKey);
   const nowMs = Date.now();
-  const hasReusableKey = listLicenseKeysByMentor(mentorTarget.id).some((item) => {
+  const mentorLicenseKeys = listLicenseKeysByMentor(mentorTarget.id);
+  const isReusableReservedKey = (item) => {
     const reservedClientEmail = normalizeEmail(item && item.reservedClientEmail);
     if (!reservedClientEmail || reservedClientEmail !== targetClientEmail) {
       return false;
@@ -3043,8 +3049,59 @@ function bootstrapDefaultBypassLicenseKey() {
 
     const expiresAt = new Date(item.expiresAt).getTime();
     return Number.isFinite(expiresAt) && expiresAt > nowMs;
-  });
+  };
+  if (isPreferredKeyValid) {
+    const preferredRecord = mentorLicenseKeys.find(
+      (item) => normalizeLicenseInput(item && item.key) === preferredLicenseKey
+    );
+    if (preferredRecord) {
+      const nextExpiresAt = new Date();
+      nextExpiresAt.setMonth(nextExpiresAt.getMonth() + 12);
+      updateLicenseKey(preferredRecord.id, {
+        status: 'available',
+        reservedClientEmail: targetClientEmail,
+        redeemedByClientEmail: null,
+        redeemedAt: null,
+        subscriptionId: null,
+        deviceId: null,
+        activatedAt: null,
+        usageCount: 0,
+        durationCode: 'year_1',
+        durationLabel: '1 Year',
+        expiresAt: nextExpiresAt.toISOString(),
+      });
+      return;
+    }
 
+    const hasPreferredCollision = listLicenseKeys().some(
+      (item) => normalizeLicenseInput(item.key) === preferredLicenseKey
+    );
+    if (!hasPreferredCollision) {
+      const mentorRobots = listRobotsByMentor(mentorTarget.id);
+      const featuredRobot = pickFeaturedRobot(mentorRobots, mentorTarget.id);
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + 12);
+      const createdPreferredKey = createLicenseKey({
+        mentorId: mentorTarget.id,
+        robotId: featuredRobot ? featuredRobot.id : null,
+        robotName: featuredRobot ? featuredRobot.name : DEFAULT_TEST_ROBOT_NAME,
+        durationCode: 'year_1',
+        durationLabel: '1 Year',
+        expiresAt: expiresAt.toISOString(),
+        status: 'available',
+        reservedClientEmail: targetClientEmail,
+      });
+
+      if (createdPreferredKey) {
+        updateLicenseKey(createdPreferredKey.id, {
+          key: preferredLicenseKey,
+        });
+      }
+      return;
+    }
+  }
+
+  const hasReusableKey = mentorLicenseKeys.some((item) => isReusableReservedKey(item));
   if (hasReusableKey) {
     return;
   }
@@ -3054,7 +3111,7 @@ function bootstrapDefaultBypassLicenseKey() {
   const expiresAt = new Date();
   expiresAt.setMonth(expiresAt.getMonth() + 12);
 
-  createLicenseKey({
+  const createdKey = createLicenseKey({
     mentorId: mentorTarget.id,
     robotId: featuredRobot ? featuredRobot.id : null,
     robotName: featuredRobot ? featuredRobot.name : DEFAULT_TEST_ROBOT_NAME,
