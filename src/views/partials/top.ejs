@@ -19,9 +19,10 @@
   </head>
   <% const isRobotInterfacePath = String(currentPath || '').startsWith('/client/robot/'); %>
   <% const isDashboardPath = String(currentPath || '').startsWith('/mentor/dashboard') || String(currentPath || '').startsWith('/superhost/dashboard') || String(currentPath || '').startsWith('/superhost/mentors/'); %>
-  <body class="<%= [isRobotInterfacePath ? 'client-robot-page' : '', isDashboardPath ? 'portal-dashboard-page' : ''].filter(Boolean).join(' ') %>">
-    <% const isClientPath = String(currentPath || '').startsWith('/client'); %>
-    <% if (!isRobotInterfacePath && !isDashboardPath) { %>
+  <% const isClientPath = String(currentPath || '').startsWith('/client'); %>
+  <% const isClientFunnelPath = isClientPath && !isRobotInterfacePath; %>
+  <body class="<%= [isRobotInterfacePath ? 'client-robot-page' : '', isDashboardPath ? 'portal-dashboard-page' : '', isClientFunnelPath ? 'client-funnel-page' : ''].filter(Boolean).join(' ') %>">
+    <% if (!isRobotInterfacePath && !isDashboardPath && !isClientPath) { %>
     <header class="site-header">
       <div class="brand">
         <a href="/" class="brand-link"><%= appName %></a>
@@ -58,7 +59,7 @@
     </header>
     <% } %>
 
-    <main class="container <%= isRobotInterfacePath ? 'container-client-robot' : '' %>">
+    <main class="container <%= isRobotInterfacePath ? 'container-client-robot' : '' %> <%= isClientFunnelPath ? 'container-client-funnel' : '' %>">
       <% if (flash) { %>
       <div class="flash <%= flash.type %>"><%= flash.message %></div>
       <% } %>

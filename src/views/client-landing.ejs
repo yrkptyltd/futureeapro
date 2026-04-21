@@ -1,24 +1,29 @@
 <%- include('partials/top', { title: title }) %>
 
-<section class="auth-card">
-  <h1>Client App</h1>
-  <p>
-    Enter your mentor ID and your email to continue to subscription setup.
-  </p>
+<section class="client-flow-screen single">
+  <article class="client-flow-card">
+    <div class="client-flow-stepper" aria-hidden="true">
+      <span class="active">Identity</span>
+      <span>Subscription</span>
+      <span>Add License Key</span>
+    </div>
+    <h1>Future EA Pro Access</h1>
+    <p class="client-flow-meta">Enter your mentor ID and client email to continue.</p>
 
-  <form action="/client/start" method="POST" class="stack-form">
-    <label>
-      Mentor ID
-      <input type="number" name="mentorPortalId" min="100" step="1" placeholder="100" required />
-    </label>
+    <form action="/client/start" method="POST" class="stack-form client-flow-form">
+      <label>
+        Mentor ID
+        <input type="number" name="mentorPortalId" min="100" step="1" placeholder="100" required />
+      </label>
 
-    <label>
-      Client Email
-      <input type="email" name="clientEmail" required />
-    </label>
+      <label>
+        Client Email
+        <input type="email" name="clientEmail" placeholder="name@email.com" required />
+      </label>
 
-    <button type="submit" class="button">Continue</button>
-  </form>
+      <button type="submit" class="button client-flow-button">Continue</button>
+    </form>
+  </article>
 </section>
 
 <%- include('partials/bottom') %>

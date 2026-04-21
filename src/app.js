@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const nodemailer = require('nodemailer');
@@ -23,6 +24,10 @@ const {
   createLicenseKey,
   listLicenseKeysByMentor,
   getLicenseKeyByMentorAndKey,
+  normalizeLicenseKey,
+  formatLicenseKeyForDisplay,
+  getLicenseKeyById,
+  listLicenseKeys,
   updateLicenseKey,
   createClientSubscription,
   getClientSubscriptionById,
@@ -35,6 +40,13 @@ const {
   verifyPassword,
   normalizeEmail,
 } = require('./lib/auth');
+const {
+  executeSignal,
+  normalizeDirection,
+  normalizePlatform,
+  getActiveBrokerConnection,
+  sanitizeConnection,
+} = require('./lib/metatrader-executor');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -42,6 +54,16 @@ const APP_NAME = 'Future EA Pro';
 const APP_SLUG = 'futureeapro';
 const SUPERHOST_EMAIL = normalizeEmail(process.env.SUPERHOST_EMAIL || 'superhost@futureeapro.com');
 const SUPERHOST_PASSWORD = process.env.SUPERHOST_PASSWORD || 'ChangeMe123!';
+const DEFAULT_TEST_MENTOR_PORTAL_ID = Number(process.env.DEFAULT_TEST_MENTOR_PORTAL_ID || 100);
+const DEFAULT_TEST_MENTOR_EMAIL = normalizeEmail(
+  process.env.DEFAULT_TEST_MENTOR_EMAIL || 'mentor.preview@futureeapro.com'
+);
+const DEFAULT_TEST_MENTOR_NAME = String(
+  process.env.DEFAULT_TEST_MENTOR_NAME || 'Future EA Pro Mentor'
+).trim();
+const DEFAULT_TEST_MENTOR_PASSWORD = process.env.DEFAULT_TEST_MENTOR_PASSWORD || 'Mentor100@Future';
+const DEFAULT_TEST_MENTOR_LICENSE_LIMIT = 1000;
+const DEFAULT_TEST_ROBOT_NAME = 'Future EA Pro Core';
 const parsedUsdExchangeRate = Number(process.env.USD_EXCHANGE_RATE || 18.5);
 const USD_EXCHANGE_RATE =
   Number.isFinite(parsedUsdExchangeRate) && parsedUsdExchangeRate > 0
@@ -78,7 +100,7 @@ const LICENSE_KEY_DURATIONS = {
   lifetime: { code: 'lifetime', label: 'Lifetime (∞)', mode: 'lifetime', value: 0 },
 };
 const LICENSE_KEY_DURATION_LIST = Object.values(LICENSE_KEY_DURATIONS);
-const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'metrader', 'details', 'settings'];
+const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'metatrader', 'details', 'settings'];
 const QUOTE_SYMBOLS = [
   '.DER30.',
   '.UK100.',
@@ -108,6 +130,37 @@ const METRADER_BROKERS = [
   'AvaTrade',
   'Other / Custom Broker',
 ];
+const METATRADER_SERVER_SUGGESTIONS = [
+  'Razor Markets Live',
+  'Razor Markets Demo',
+  'IC Markets Live',
+  'IC Markets Demo',
+  'Exness Live',
+  'Exness Demo',
+  'XM Live',
+  'XM Demo',
+  'Pepperstone Live',
+  'Pepperstone Demo',
+  'HFM Live',
+  'OANDA Live',
+  'OANDA Demo',
+];
+const METATRADER_ASSET_CLASSES = ['Forex', 'CFD', 'Commodities', 'Synthetic indices'];
+const TRADE_DIRECTIONS = ['BUY', 'SELL', 'BOTH'];
+const TRADE_DIRECTION_SET = new Set(TRADE_DIRECTIONS);
+const DEFAULT_SYMBOL_CONFIG = {
+  lotSize: 0.01,
+  maxTrades: 1,
+  direction: 'BUY',
+};
+const TRADE_EXECUTION_FIELD_LABELS = {
+  count: 'count',
+  lastExecutedAt: 'lastExecutedAt',
+  lastOrderId: 'lastOrderId',
+  lastDirection: 'lastDirection',
+  lastSymbol: 'lastSymbol',
+  lastStatus: 'lastStatus',
+};
 const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.svg'];
 const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
@@ -115,6 +168,9 @@ const LEGACY_ROBOT_NAME_PATTERN = /algo\s*nova\s*ea\s*v?6/i;
 const FORBIDDEN_ROBOT_IMAGE_PATTERNS = [
   /robot-preview-user/i,
   /b287272d-29f2-4670-9026-359dff57c5e6/i,
+  /futureeapro-red-master/i,
+  /robot-(cobalt|orion|aurora|ember)/i,
+  /futureeapro-blue-mortal-kombat/i,
   /img_4755/i,
   /img_8085/i,
   /img_8084/i,
@@ -123,6 +179,22 @@ const FORBIDDEN_ROBOT_IMAGE_PATTERNS = [
   /trade[\s_-]*port/i,
 ];
 const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
+  {
+    id: 'blue-mortal-motion',
+    label: 'Blue Mortal Motion',
+    type: 'video',
+    src: '/assets/background-videos/blue-mortal-motion.mp4',
+    poster: '/assets/future-ea-pro-logo.svg',
+    themeHint: 'blue',
+  },
+  {
+    id: 'blue-mortal-motion-alt',
+    label: 'Blue Mortal Motion Alt',
+    type: 'video',
+    src: '/assets/background-videos/blue-mortal-motion-alt.mp4',
+    poster: '/assets/future-ea-pro-logo.svg',
+    themeHint: 'blue',
+  },
   {
     id: 'uploaded-video-01',
     label: 'Neon Flux Motion',
@@ -269,12 +341,14 @@ ensureDataFile();
 ensureMentorPortalIds();
 ensureDefaultThemePalette();
 bootstrapSuperhost();
+bootstrapDefaultMentorAccount();
 migrateLegacyRobotImages();
 migrateLegacyRobotNames();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/previews', express.static(path.join(__dirname, '..', 'previews')));
@@ -436,6 +510,379 @@ app.get('/download/ios', (_req, res) => {
   });
 });
 
+function handleApiMentorLookup(req, res) {
+  const payload = readApiPayload(req);
+  const mentorPortalId = parseMentorPortalIdInput(
+    req.params.mentorPortalId ||
+      payload.mentorPortalId ||
+      payload.mentorId ||
+      payload.mentorNumber ||
+      payload.mentor_id ||
+      payload.number
+  );
+
+  if (!mentorPortalId) {
+    return res.status(200).json({
+      ok: false,
+      canAccess: false,
+      message: 'Mentor ID not found.',
+    });
+  }
+
+  const mentor = getMentorByPortalId(mentorPortalId);
+  if (!mentor || mentor.role !== 'mentor') {
+    return res.status(200).json({
+      ok: false,
+      canAccess: false,
+      message: 'Mentor ID not found.',
+    });
+  }
+
+  if (!mentor.approved || !mentor.subscriptionActive) {
+    return res.status(200).json({
+      ok: false,
+      canAccess: false,
+      message: 'Mentor account is not active.',
+    });
+  }
+
+  const clientEmail = normalizeEmail(payload.clientEmail || payload.email || payload.client_email);
+  const mentorRobots = listRobotsByMentor(mentor.id);
+  const featuredRobot = pickFeaturedRobot(mentorRobots, mentor.id);
+
+  return res.status(200).json({
+    ok: true,
+    canAccess: true,
+    mentor: {
+      id: mentor.id,
+      mentorId: mentor.mentorPortalId,
+      name: mentor.name,
+      email: mentor.email,
+      approved: true,
+      subscriptionActive: true,
+    },
+    clientEmail,
+    subscriptionBypassed: clientEmail ? isClientSubscriptionBypassed(clientEmail) : false,
+    plans: CLIENT_PLAN_LIST,
+    robot: featuredRobot
+      ? {
+          id: featuredRobot.id,
+          name: sanitizeRobotName(featuredRobot.name),
+          imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.svg',
+          priceZar: Number(mentor.robotPricePerKey || 0),
+        }
+      : null,
+  });
+}
+
+app.all('/api/mentors/by-number', handleApiMentorLookup);
+app.all('/api/mentors/by-number/:mentorPortalId', handleApiMentorLookup);
+
+app.post('/api/payments/start', (req, res) => {
+  const payload = readApiPayload(req);
+  const mentorPortalId = parseMentorPortalIdInput(
+    payload.mentorPortalId || payload.mentorId || payload.mentorNumber || payload.mentor_id
+  );
+  const mentor = mentorPortalId ? getMentorByPortalId(mentorPortalId) : null;
+  if (!mentor || mentor.role !== 'mentor' || !mentor.approved || !mentor.subscriptionActive) {
+    return res.status(200).json({
+      ok: false,
+      paid: false,
+      message: 'Mentor ID not found.',
+    });
+  }
+
+  const clientEmail = normalizeEmail(payload.clientEmail || payload.email || payload.client_email);
+  const planCode = String(payload.planCode || payload.plan || '').trim();
+  const plan = getClientPlan(planCode) || CLIENT_PLANS.month_1;
+  const bypassed = isClientSubscriptionBypassed(clientEmail);
+
+  return res.status(200).json({
+    ok: true,
+    paid: true,
+    bypassed,
+    paymentMode: 'test',
+    planCode: bypassed ? CLIENT_BYPASS_PLAN.code : plan.code,
+    amountZar: bypassed ? 0 : plan.amountZar,
+    message: bypassed ? 'Bypass access granted.' : 'Payment confirmed (test mode).',
+  });
+});
+
+app.post('/api/licenses/validate', (req, res) => {
+  const payload = readApiPayload(req);
+  const mentorPortalId = parseMentorPortalIdInput(
+    payload.mentorPortalId || payload.mentorId || payload.mentorNumber || payload.mentor_id
+  );
+  const mentor = mentorPortalId ? getMentorByPortalId(mentorPortalId) : null;
+  if (!mentor || mentor.role !== 'mentor' || !mentor.approved || !mentor.subscriptionActive) {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'Mentor ID not found.',
+    });
+  }
+
+  const clientEmail = normalizeEmail(payload.clientEmail || payload.email || payload.client_email);
+  const enteredLicenseKey = normalizeLicenseInput(
+    payload.licenseKey || payload.key || payload.license || payload.code
+  );
+  const mentorRobots = listRobotsByMentor(mentor.id);
+  const featuredRobot = pickFeaturedRobot(mentorRobots, mentor.id);
+
+  if (!enteredLicenseKey) {
+    return res.status(200).json({
+      ok: true,
+      valid: true,
+      stage: 'identity',
+      mentor: {
+        id: mentor.id,
+        mentorId: mentor.mentorPortalId,
+        name: mentor.name,
+      },
+      clientEmail,
+      subscriptionBypassed: clientEmail ? isClientSubscriptionBypassed(clientEmail) : false,
+      plans: CLIENT_PLAN_LIST,
+      robot: featuredRobot
+        ? {
+            id: featuredRobot.id,
+            name: sanitizeRobotName(featuredRobot.name),
+            imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.svg',
+          }
+        : null,
+    });
+  }
+
+  const licenseRecord = getLicenseKeyByMentorAndKey(mentor.id, enteredLicenseKey);
+  if (!licenseRecord) {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'Invalid license key for this mentor.',
+    });
+  }
+
+  const incomingDeviceId = getRequestDeviceId(req, payload.deviceId || payload.device || '');
+  const rawStatus = String(licenseRecord.status || 'available').trim().toLowerCase();
+  if (rawStatus !== 'available' && rawStatus !== 'active') {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'This license key cannot be used right now.',
+    });
+  }
+
+  if (isLicenseKeyRedeemed(licenseRecord)) {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'This license key has already been used.',
+    });
+  }
+
+  if (licenseRecord.deviceId && incomingDeviceId && licenseRecord.deviceId !== incomingDeviceId) {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'This license key is already linked to another device.',
+    });
+  }
+
+  const reservedEmail = normalizeEmail(licenseRecord.reservedClientEmail);
+  if (reservedEmail && clientEmail && reservedEmail !== clientEmail) {
+    return res.status(200).json({
+      ok: false,
+      valid: false,
+      message: 'This key is reserved for a different client email.',
+    });
+  }
+
+  if (licenseRecord.expiresAt) {
+    const expiresAt = new Date(licenseRecord.expiresAt);
+    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+      return res.status(200).json({
+        ok: false,
+        valid: false,
+        message: 'This license key has expired.',
+      });
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    valid: true,
+    mentor: {
+      id: mentor.id,
+      mentorId: mentor.mentorPortalId,
+      name: mentor.name,
+    },
+    license: {
+      id: licenseRecord.id,
+      key: formatLicenseKeyForDisplay(licenseRecord.key),
+      keyRaw: normalizeLicenseInput(licenseRecord.key),
+      durationCode: licenseRecord.durationCode || '',
+      durationLabel: licenseRecord.durationLabel || '',
+      expiresAt: licenseRecord.expiresAt || null,
+      robotId: licenseRecord.robotId || null,
+      robotName: sanitizeRobotName(licenseRecord.robotName || ''),
+    },
+  });
+});
+
+app.post('/api/licenses/unlock-client', (req, res) => {
+  const payload = readApiPayload(req);
+  const mentorPortalId = parseMentorPortalIdInput(
+    payload.mentorPortalId || payload.mentorId || payload.mentorNumber || payload.mentor_id
+  );
+  const mentor = mentorPortalId ? getMentorByPortalId(mentorPortalId) : null;
+  if (!mentor || mentor.role !== 'mentor' || !mentor.approved || !mentor.subscriptionActive) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'Mentor ID not found.',
+    });
+  }
+
+  const clientEmail = normalizeEmail(payload.clientEmail || payload.email || payload.client_email);
+  if (!clientEmail || !clientEmail.includes('@')) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'Client email is required.',
+    });
+  }
+
+  const enteredLicenseKey = normalizeLicenseInput(
+    payload.licenseKey || payload.key || payload.license || payload.code
+  );
+  if (!enteredLicenseKey) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'License key is required.',
+    });
+  }
+
+  const licenseRecord = getLicenseKeyByMentorAndKey(mentor.id, enteredLicenseKey);
+  if (!licenseRecord) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'Invalid license key for this mentor.',
+    });
+  }
+
+  const incomingDeviceId = getRequestDeviceId(req, payload.deviceId || payload.device || '');
+  const rawStatus = String(licenseRecord.status || 'available').trim().toLowerCase();
+  if (rawStatus !== 'available' && rawStatus !== 'active') {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'This license key cannot be used right now.',
+    });
+  }
+
+  if (isLicenseKeyRedeemed(licenseRecord)) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'This license key has already been used.',
+    });
+  }
+
+  if (licenseRecord.deviceId && incomingDeviceId && licenseRecord.deviceId !== incomingDeviceId) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'This license key is already linked to another device.',
+    });
+  }
+
+  const reservedEmail = normalizeEmail(licenseRecord.reservedClientEmail);
+  if (reservedEmail && reservedEmail !== clientEmail) {
+    return res.status(200).json({
+      ok: false,
+      unlocked: false,
+      message: 'This key is reserved for a different client email.',
+    });
+  }
+
+  if (licenseRecord.expiresAt) {
+    const expiresAt = new Date(licenseRecord.expiresAt);
+    if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+      return res.status(200).json({
+        ok: false,
+        unlocked: false,
+        message: 'This license key has expired.',
+      });
+    }
+  }
+
+  const bypassed = isClientSubscriptionBypassed(clientEmail);
+  const requestedPlanCode = String(payload.planCode || payload.plan || '').trim();
+  const plan = bypassed
+    ? CLIENT_BYPASS_PLAN
+    : getClientPlan(requestedPlanCode) || CLIENT_PLANS.month_1;
+
+  const startedAt = new Date();
+  const endsAt = addMonths(startedAt, plan.durationMonths);
+  const subscription = createClientSubscription({
+    mentorId: mentor.id,
+    mentorPortalId: mentor.mentorPortalId,
+    clientEmail,
+    planCode: plan.code,
+    durationMonths: plan.durationMonths,
+    amountZar: plan.amountZar,
+    robotId: licenseRecord.robotId || null,
+    robotName: licenseRecord.robotName || '',
+    licenseDurationCode: licenseRecord.durationCode || '',
+    licenseDurationLabel: licenseRecord.durationLabel || '',
+    licenseKeyExpiresAt: licenseRecord.expiresAt || null,
+    licenseKey: normalizeLicenseInput(licenseRecord.key),
+    licenseNumber: licenseRecord.licenseNumber,
+    startedAt: startedAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    status: 'active',
+  });
+
+  updateLicenseKey(licenseRecord.id, {
+    status: 'redeemed',
+    deviceId: incomingDeviceId,
+    activatedAt: new Date().toISOString(),
+    usageCount: Number(licenseRecord.usageCount || 0) + 1,
+    redeemedByClientEmail: clientEmail,
+    redeemedAt: new Date().toISOString(),
+    subscriptionId: subscription.id,
+  });
+
+  return res.status(200).json({
+    ok: true,
+    unlocked: true,
+    subscriptionId: subscription.id,
+    mentorId: mentor.mentorPortalId,
+    redirect: `/client/robot/${subscription.id}`,
+  });
+});
+
+app.get('/api/economic-events', async (_req, res) => {
+  const items = await getUpcomingForexEvents(new Date());
+  return res.status(200).json({
+    ok: true,
+    count: items.length,
+    events: items,
+  });
+});
+
+app.post('/api/trade-event', async (req, res) => {
+  const payload = readApiPayload(req);
+  return res.status(200).json({
+    ok: true,
+    queued: true,
+    direction: normalizeDirection(payload.direction || payload.side || ''),
+    symbol: String(payload.symbol || payload.pair || '').trim().toUpperCase(),
+    message: 'Trade event accepted for processing.',
+  });
+});
+
 app.post('/client/start', (req, res) => {
   const body = req.body || {};
   const mentorPortalId = Number(body.mentorPortalId);
@@ -479,11 +926,7 @@ app.post('/client/start', (req, res) => {
   };
 
   if (isBypassClient) {
-    setFlash(
-      req,
-      'success',
-      'Subscription fee bypass enabled for this email. Continue with your mentor license key.'
-    );
+    setFlash(req, 'success', 'Continue with your mentor license key.');
     return res.redirect('/client/unlock');
   }
 
@@ -572,6 +1015,7 @@ app.get('/client/unlock', (req, res) => {
     flow,
     plan,
     featuredRobot,
+    deviceId: getRequestDeviceId(req, req.session.clientDeviceId || ''),
   });
 });
 
@@ -601,7 +1045,7 @@ app.post('/client/unlock', (req, res) => {
     return res.redirect('/client/subscription');
   }
 
-  const enteredLicenseKey = String(body.licenseKey || '').trim();
+  const enteredLicenseKey = normalizeLicenseInput(body.licenseKey);
   if (!enteredLicenseKey) {
     setFlash(req, 'error', 'Please enter your unique license key from your mentor.');
     return res.redirect('/client/unlock');
@@ -613,8 +1057,24 @@ app.post('/client/unlock', (req, res) => {
     return res.redirect('/client/unlock');
   }
 
+  const incomingDeviceId = getRequestDeviceId(req, body.deviceId || req.session.clientDeviceId || '');
+  req.session.clientDeviceId = incomingDeviceId;
+  const rawStatus = String(licenseRecord.status || 'available').trim().toLowerCase();
+  if (
+    rawStatus !== 'available' &&
+    rawStatus !== 'active'
+  ) {
+    setFlash(req, 'error', 'This license key cannot be used right now.');
+    return res.redirect('/client/unlock');
+  }
+
   if (isLicenseKeyRedeemed(licenseRecord)) {
     setFlash(req, 'error', 'This license key has already been used.');
+    return res.redirect('/client/unlock');
+  }
+
+  if (licenseRecord.deviceId && licenseRecord.deviceId !== incomingDeviceId) {
+    setFlash(req, 'error', 'This license key is already linked to another device.');
     return res.redirect('/client/unlock');
   }
 
@@ -646,7 +1106,7 @@ app.post('/client/unlock', (req, res) => {
     licenseDurationCode: licenseRecord.durationCode || '',
     licenseDurationLabel: licenseRecord.durationLabel || '',
     licenseKeyExpiresAt: licenseRecord.expiresAt || null,
-    licenseKey: licenseRecord.key,
+    licenseKey: normalizeLicenseInput(licenseRecord.key),
     licenseNumber: licenseRecord.licenseNumber,
     startedAt: startedAt.toISOString(),
     endsAt: endsAt.toISOString(),
@@ -655,6 +1115,9 @@ app.post('/client/unlock', (req, res) => {
 
   updateLicenseKey(licenseRecord.id, {
     status: 'redeemed',
+    deviceId: incomingDeviceId,
+    activatedAt: new Date().toISOString(),
+    usageCount: Number(licenseRecord.usageCount || 0) + 1,
     redeemedByClientEmail: flow.clientEmail,
     redeemedAt: new Date().toISOString(),
     subscriptionId: subscription.id,
@@ -709,16 +1172,48 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     mentor ? mentor.id : subscription.mentorId
   );
   const plan = getClientPlan(subscription.planCode);
-  const requestedSection = String(req.query.section || 'home').trim().toLowerCase();
-  const activeSection = CLIENT_ROBOT_SECTIONS.includes(requestedSection) ? requestedSection : 'home';
+  const requestedSection = normalizeClientRobotSection(req.query.section);
+  const activeSection = requestedSection;
   const brokerConnections = Array.isArray(subscription.brokerConnections)
     ? subscription.brokerConnections
     : [];
   const symbols = getMentorAvailableSymbols(featuredRobot);
-  const allowedSymbols = getClientAllowedSymbols(subscription, symbols);
-  const selectedSymbolsLookup = {};
-  for (const symbol of allowedSymbols) {
-    selectedSymbolsLookup[symbol] = true;
+  const symbolConfigs = getClientSymbolConfigMap(subscription, symbols);
+  const availableSymbolMap = getMentorAvailableSymbolsMap(symbols);
+  const configuredSymbolRows = Object.keys(symbolConfigs)
+    .map((symbol) => symbolConfigs[symbol])
+    .sort((a, b) => String(a.symbol || '').localeCompare(String(b.symbol || '')));
+  const quoteRows = symbols.map((symbol) => {
+    const safeToken = makeSymbolFieldToken(symbol);
+    const config = symbolConfigs[symbol] || null;
+    const normalized = config || {
+      lotSize: DEFAULT_SYMBOL_CONFIG.lotSize,
+      maxTrades: DEFAULT_SYMBOL_CONFIG.maxTrades,
+      direction: DEFAULT_SYMBOL_CONFIG.direction,
+    };
+    return {
+      symbol,
+      lotSize: Number(normalized.lotSize),
+      maxTrades: Number(normalized.maxTrades),
+      direction: normalized.direction,
+      safeToken,
+      config,
+      selected: Boolean(config),
+    };
+  });
+  const allowedQuoteRows = configuredSymbolRows.map((item) => ({
+    symbol: item.symbol,
+    lotSize: Number(item.lotSize),
+    direction: item.direction,
+    maxTrades: Number(item.maxTrades),
+    safeToken: makeSymbolFieldToken(item.symbol),
+    selected: true,
+  }));
+  const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
+  const activeBrokerConnection = getActiveBrokerConnection(brokerConnections, 'MT5');
+  const selectedSymbolLookup = Object.create(null);
+  for (const symbol of Object.keys(symbolConfigs)) {
+    selectedSymbolLookup[symbol] = true;
   }
 
   return res.render('client-robot-interface', {
@@ -731,15 +1226,28 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     activeSection,
     backgroundMediaLibrary: CLIENT_BACKGROUND_MEDIA_LIBRARY,
     defaultBackgroundMediaId: CLIENT_DEFAULT_BACKGROUND_MEDIA_ID,
+    sectionLabel: activeSection === 'metatrader' ? 'MetaTrader' : '',
     brokerOptions: METRADER_BROKERS,
+    brokerAssetClasses: METATRADER_ASSET_CLASSES,
+    serverSuggestions: METATRADER_SERVER_SUGGESTIONS,
+    metatraderConnectionStatus: activeBrokerConnection
+      ? sanitizeConnection(activeBrokerConnection)
+      : null,
+    activeBrokerConnection,
     brokerConnections,
-    quoteRows: buildQuoteRows(symbols),
-    allowedQuoteRows: buildQuoteRows(allowedSymbols),
-    selectedSymbolsLookup,
+    quoteRows: quoteRows,
+    allowedQuoteRows,
+    configuredSymbolRows,
+    selectedSymbolLookup,
+    symbolConfigs,
+    defaultSymbolConfigs: DEFAULT_SYMBOL_CONFIG,
+    executionState,
+    executionSymbolRows: buildExecutionSymbolRows(availableSymbolMap, symbolConfigs, executionState),
+    tradeExecutionMessage: '',
   });
 });
 
-app.post('/client/robot/:subscriptionId/symbols/allowed', (req, res) => {
+function handleClientSymbolConfigRequest(req, res) {
   const subscription = getClientSubscriptionById(req.params.subscriptionId);
   if (!subscription) {
     setFlash(req, 'error', 'Robot session not found.');
@@ -752,6 +1260,11 @@ app.post('/client/robot/:subscriptionId/symbols/allowed', (req, res) => {
   }
 
   const mentor = getUserById(subscription.mentorId);
+  if (!mentor) {
+    setFlash(req, 'error', 'Mentor not found.');
+    return res.redirect('/client');
+  }
+
   const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
   const featuredRobot = pickSubscriptionRobot(
     subscription,
@@ -759,30 +1272,25 @@ app.post('/client/robot/:subscriptionId/symbols/allowed', (req, res) => {
     mentor ? mentor.id : subscription.mentorId
   );
   const symbols = getMentorAvailableSymbols(featuredRobot);
-  const validSymbolSet = new Set(symbols);
-  const rawSymbols = req.body && req.body.symbols;
-  const selectedSymbols = parseSymbolsInput(rawSymbols).filter((symbol) =>
-    validSymbolSet.has(symbol)
-  );
+  const savedSymbols = upsertClientSymbolConfigs(subscription, symbols, req.body);
 
-  updateClientSubscription(subscription.id, {
-    selectedSymbols,
-  });
-
-  if (selectedSymbols.length) {
+  if (savedSymbols.length) {
     setFlash(
       req,
       'success',
-      `${selectedSymbols.length} allowed symbol${selectedSymbols.length === 1 ? '' : 's'} saved.`
+      `${savedSymbols.length} allowed symbol${savedSymbols.length === 1 ? '' : 's'} configured.`
     );
   } else {
-    setFlash(req, 'success', 'Allowed symbols cleared. You can pick any from Symbols again.');
+    setFlash(req, 'success', 'Allowed symbols cleared. Add symbols when you are ready.');
   }
 
   return res.redirect(`/client/robot/${subscription.id}?section=quotes`);
-});
+}
 
-app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
+app.post('/client/robot/:subscriptionId/symbols/configure', handleClientSymbolConfigRequest);
+app.post('/client/robot/:subscriptionId/symbols/allowed', handleClientSymbolConfigRequest);
+
+function handleClientMetaTraderConnect(req, res) {
   const subscription = getClientSubscriptionById(req.params.subscriptionId);
   if (!subscription) {
     setFlash(req, 'error', 'Robot session not found.');
@@ -795,52 +1303,58 @@ app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
   }
 
   const body = req.body || {};
-  const platform = String(body.platform || '').trim().toUpperCase();
+  const platform = normalizePlatform(String(body.platform || '').trim());
   const selectedBroker = String(body.brokerName || '').trim();
   const customBrokerName = String(body.customBrokerName || '').trim();
   const accountNumber = String(body.accountNumber || '').trim();
   const serverName = String(body.serverName || '').trim();
-  const notes = String(body.notes || '').trim();
+  const password = String(body.password || '').trim();
+  const assetClass = String(body.assetClass || '').trim();
+  const brokerName = resolveBrokerName(selectedBroker, customBrokerName);
 
   if (platform !== 'MT4' && platform !== 'MT5') {
     setFlash(req, 'error', 'Please select MT4 or MT5.');
-    return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
   }
 
-  if (!selectedBroker) {
-    setFlash(req, 'error', 'Please choose a broker.');
-    return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
-  }
-
-  let brokerName = selectedBroker;
-  if (selectedBroker === 'Other / Custom Broker') {
-    if (!customBrokerName) {
-      setFlash(req, 'error', 'Please enter your custom broker name.');
-      return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
-    }
-    brokerName = customBrokerName;
+  if (!brokerName) {
+    setFlash(req, 'error', 'Please provide a broker name.');
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
   }
 
   if (!accountNumber) {
     setFlash(req, 'error', 'Account number is required.');
-    return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
   }
 
   if (!serverName) {
     setFlash(req, 'error', 'Broker server is required.');
-    return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
+  }
+
+  if (!password) {
+    setFlash(req, 'error', 'Password is required.');
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
+  }
+
+  if (!isAllowedBrokerAssetClass(assetClass)) {
+    setFlash(req, 'error', 'Please select a valid asset class.');
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
   }
 
   const existingConnections = Array.isArray(subscription.brokerConnections)
     ? subscription.brokerConnections
     : [];
+  const passwordParts = createPasswordHash(password);
   const newConnection = {
     id: `brk_${Date.now()}`,
     platform,
     brokerName,
     accountNumber,
     serverName,
-    notes,
+    assetClass,
+    passwordSalt: passwordParts.salt,
+    passwordHash: passwordParts.hash,
     status: 'connected',
     connectedAt: new Date().toISOString(),
   };
@@ -854,7 +1368,130 @@ app.post('/client/robot/:subscriptionId/metrader/connect', (req, res) => {
     'success',
     `${platform} broker connected: ${brokerName}. Razor Markets and other brokers are supported.`
   );
-  return res.redirect(`/client/robot/${subscription.id}?section=metrader`);
+  return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
+}
+
+app.post('/client/robot/:subscriptionId/metatrader/connect', handleClientMetaTraderConnect);
+app.post('/client/robot/:subscriptionId/metrader/connect', handleClientMetaTraderConnect);
+
+app.post('/client/robot/:subscriptionId/trade/execute', async (req, res) => {
+  const subscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!subscription) {
+    setFlash(req, 'error', 'Robot session not found.');
+    return res.redirect('/client');
+  }
+
+  if (!isSubscriptionActiveNow(subscription, new Date())) {
+    setFlash(req, 'error', 'Subscription expired. Please renew your plan.');
+    return res.redirect('/client');
+  }
+
+  const body = req.body || {};
+  const symbol = normalizeSymbolToken(body.symbol || '');
+  if (!symbol) {
+    setFlash(req, 'error', 'Select a symbol to execute.');
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const platform = normalizePlatform(body.platform || 'MT5');
+  const requestedDirection = normalizeDirection(body.direction || '');
+  if (!requestedDirection) {
+    setFlash(req, 'error', 'Choose a valid execution direction.');
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const mentor = getUserById(subscription.mentorId);
+  const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
+  const robotName = sanitizeRobotName(featuredRobot ? featuredRobot.name : DEFAULT_ROBOT_NAME);
+  const mentorSymbols = getMentorAvailableSymbols(featuredRobot);
+  const symbolConfigs = getClientSymbolConfigMap(subscription, mentorSymbols);
+  const symbolConfig = symbolConfigs[symbol];
+  if (!symbolConfig) {
+    setFlash(req, 'error', 'Symbol is not allowed for this robot.');
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const maxTrades = toNonNegativeInteger(symbolConfig.maxTrades, 0);
+  const normalizedDirection =
+    symbolConfig.direction === 'BOTH' ? requestedDirection : symbolConfig.direction;
+  if (symbolConfig.direction !== 'BOTH' && normalizedDirection !== requestedDirection) {
+    setFlash(
+      req,
+      'error',
+      `Direction not allowed for ${symbol}. Allowed: ${symbolConfig.direction}.`
+    );
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const connection = getActiveBrokerConnection(subscription.brokerConnections, platform);
+  if (!connection || !connection.platform || !connection.brokerName || !connection.accountNumber) {
+    setFlash(req, 'error', `No active ${platform} connection found. Connect in MetaTrader first.`);
+    return res.redirect(`/client/robot/${subscription.id}?section=metatrader`);
+  }
+
+  const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
+  const currentSymbolState = executionState.bySymbol[symbol] || {
+    count: 0,
+    lastExecutedAt: null,
+    lastOrderId: null,
+    lastDirection: null,
+    lastSymbol: null,
+    lastStatus: null,
+  };
+  if (maxTrades > 0 && Number(currentSymbolState.count || 0) >= maxTrades) {
+    setFlash(req, 'error', `Max trades reached for ${symbol}.`);
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const lotSize = parseDecimalInput(body.lotSize || symbolConfig.lotSize, symbolConfig.lotSize);
+  const stopLoss = parseTradeLevelInput(body.stopLoss);
+  const takeProfit = parseTradeLevelInput(body.takeProfit);
+  const executeResult = await executeSignal({
+    platform,
+    symbol,
+    direction: normalizedDirection,
+    lotSize,
+    maxTrades,
+    stopLoss,
+    takeProfit,
+    connection,
+    comment: `${robotName} signal`,
+    platformComment: robotName,
+  });
+
+  if (!executeResult || !executeResult.ok) {
+    const reason = executeResult && executeResult.reason ? executeResult.reason : 'signal execution failed.';
+    setFlash(req, 'error', `Trade execution blocked: ${reason}`);
+    return res.redirect(`/client/robot/${subscription.id}?section=trade`);
+  }
+
+  const nextSymbolState = {
+    ...currentSymbolState,
+    count: Number(currentSymbolState.count || 0) + 1,
+    lastExecutedAt: new Date().toISOString(),
+    lastOrderId: executeResult.result ? executeResult.result.orderId : null,
+    lastDirection: normalizedDirection,
+    lastSymbol: symbol,
+    lastStatus: 'sent',
+  };
+  executionState.total = Number(executionState.total || 0) + 1;
+  executionState.bySymbol[symbol] = nextSymbolState;
+
+  updateClientSubscription(subscription.id, {
+    tradeExecution: executionState,
+  });
+
+  setFlash(
+    req,
+    'success',
+    `Trade executed for ${symbol}. Order ${nextSymbolState.lastOrderId || 'queued'} sent to ${platform}.`
+  );
+  return res.redirect(`/client/robot/${subscription.id}?section=trade`);
 });
 
 app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res) => {
@@ -872,7 +1509,7 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res
     title: 'Mentor Dashboard',
     mentor: dashboard.account,
     robots: dashboard.robots,
-    licenseKeys: dashboard.licenseKeys,
+    licenseKeys: dashboard.licenseKeys.map(attachLicenseKeyDisplay),
     activeKeysUsed: dashboard.activeKeysUsed,
     dashboardTotals: dashboard.dashboardTotals,
     businessMetrics: dashboard.businessMetrics,
@@ -998,6 +1635,27 @@ app.post('/mentor/robots/:robotId/symbols', requireAuth, requireRole('mentor'), 
   return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
 });
 
+app.post('/mentor/robots/:robotId/image', requireAuth, requireRole('mentor'), (req, res) => {
+  const robot = getRobotById(req.params.robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Robot not found.');
+    return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+  }
+
+  const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
+  const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
+  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
+    ? pickDefaultRobotImage(imageSeed)
+    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+
+  updateRobot(robot.id, {
+    imageUrl,
+  });
+
+  setFlash(req, 'success', `Hero image updated for ${robot.name}.`);
+  return res.redirect('/mentor/dashboard?section=manage-eas#manage-eas');
+});
+
 app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), async (req, res) => {
   const body = req.body || {};
   const mentor = getUserById(req.currentUser.id);
@@ -1065,7 +1723,7 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     mentorPortalId: mentor.mentorPortalId,
     clientName,
     clientEmail: reservedClientEmail,
-    key: createdKey.key,
+    key: formatLicenseKeyForDisplay(createdKey.key),
     robotName: robotDisplayName,
     durationLabel: durationOption.label,
     expiresAt: createdKey.expiresAt,
@@ -1078,15 +1736,36 @@ app.post('/mentor/license-keys/generate', requireAuth, requireRole('mentor'), as
     setFlash(
       req,
       'success',
-      `Key ${createdKey.key} generated for ${reservedClientEmail}, emailed automatically, and ready to copy from dashboard.`
+      `Key ${formatLicenseKeyForDisplay(createdKey.key)} generated for ${reservedClientEmail}, emailed automatically, and ready to copy from dashboard.`
     );
   } else {
     setFlash(
       req,
       'success',
-      `Key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
+      `Key ${formatLicenseKeyForDisplay(createdKey.key)} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
+  return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
+});
+
+app.post('/mentor/license-keys/:licenseKeyId/reactivate', requireAuth, requireRole('mentor'), (req, res) => {
+  const licenseKey = getLicenseKeyById(req.params.licenseKeyId);
+  if (!licenseKey || licenseKey.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'License key not found.');
+    return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
+  }
+
+  updateLicenseKey(licenseKey.id, {
+    status: 'available',
+    deviceId: null,
+    activatedAt: null,
+    usageCount: 0,
+    redeemedByClientEmail: null,
+    redeemedAt: null,
+    subscriptionId: null,
+  });
+
+  setFlash(req, 'success', `License key ${formatLicenseKeyForDisplay(licenseKey.key)} has been reactivated.`);
   return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
 });
 
@@ -1163,7 +1842,7 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (re
       totalKeys: keys.length,
       activeSubscribers,
       pendingEmailsCount,
-      licenseKeys: keys,
+      licenseKeys: keys.map(attachLicenseKeyDisplay),
       clientSubscriptions,
       accountState,
     };
@@ -1193,7 +1872,7 @@ app.get('/superhost/dashboard', requireAuth, requireRole('superhost'), async (re
         .filter((item) => item.reservedClientEmail && !item.emailSentAt)
         .map((item) => ({
           id: item.id,
-          key: item.key,
+          key: formatLicenseKeyForDisplay(item.key),
           clientEmail: item.reservedClientEmail,
           robotName: item.robotName || 'Not set',
           durationLabel: item.durationLabel || 'Not set',
@@ -1441,6 +2120,27 @@ app.post('/superhost/robots/:robotId/symbols', requireAuth, requireRole('superho
   return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
+app.post('/superhost/robots/:robotId/image', requireAuth, requireRole('superhost'), (req, res) => {
+  const robot = getRobotById(req.params.robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Robot not found.');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
+  }
+
+  const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
+  const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
+  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
+    ? pickDefaultRobotImage(imageSeed)
+    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+
+  updateRobot(robot.id, {
+    imageUrl,
+  });
+
+  setFlash(req, 'success', `Hero image updated for ${robot.name}.`);
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
+});
+
 app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost'), async (req, res) => {
   const superhost = getUserById(req.currentUser.id);
   if (!superhost.subscriptionActive) {
@@ -1499,7 +2199,7 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
     mentorEmail: superhost.email,
     mentorPortalId: superhost.mentorPortalId || 'SUPERHOST',
     clientEmail: reservedClientEmail,
-    key: createdKey.key,
+    key: formatLicenseKeyForDisplay(createdKey.key),
     robotName: robotDisplayName,
     durationLabel: durationOption.label,
     expiresAt: createdKey.expiresAt,
@@ -1512,15 +2212,36 @@ app.post('/superhost/license-keys/generate', requireAuth, requireRole('superhost
     setFlash(
       req,
       'success',
-      `New key ${createdKey.key} generated, emailed to ${reservedClientEmail}, and ready to copy from dashboard.`
+      `Key ${formatLicenseKeyForDisplay(createdKey.key)} generated, emailed to ${reservedClientEmail}, and ready to copy from dashboard.`
     );
   } else {
     setFlash(
       req,
       'success',
-      `New key ${createdKey.key} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
+      `Key ${formatLicenseKeyForDisplay(createdKey.key)} generated for ${reservedClientEmail}. Email not sent (${emailResult.reason}).`
     );
   }
+  return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
+});
+
+app.post('/superhost/license-keys/:licenseKeyId/reactivate', requireAuth, requireRole('superhost'), (req, res) => {
+  const licenseKey = getLicenseKeyById(req.params.licenseKeyId);
+  if (!licenseKey) {
+    setFlash(req, 'error', 'License key not found.');
+    return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
+  }
+
+  updateLicenseKey(licenseKey.id, {
+    status: 'available',
+    deviceId: null,
+    activatedAt: null,
+    usageCount: 0,
+    redeemedByClientEmail: null,
+    redeemedAt: null,
+    subscriptionId: null,
+  });
+
+  setFlash(req, 'success', `License key ${formatLicenseKeyForDisplay(licenseKey.key)} has been reactivated.`);
   return res.redirect('/superhost/dashboard?section=my-robots#my-robots');
 });
 
@@ -1582,9 +2303,14 @@ app.get('/superhost/mentors/:mentorId', requireAuth, requireRole('superhost'), (
     return res.redirect('/superhost/dashboard?section=users#users');
   }
 
+  const mentorDetails = {
+    ...details,
+    licenseKeys: (details.licenseKeys || []).map(attachLicenseKeyDisplay),
+  };
+
   return res.render('superhost-mentor-details', {
     title: 'Mentor Details',
-    details,
+    details: mentorDetails,
   });
 });
 
@@ -1986,6 +2712,76 @@ function bootstrapSuperhost() {
   updateUser(superhostTarget.id, updates);
 }
 
+function bootstrapDefaultMentorAccount() {
+  const targetPortalId =
+    Number.isInteger(DEFAULT_TEST_MENTOR_PORTAL_ID) && DEFAULT_TEST_MENTOR_PORTAL_ID >= 100
+      ? DEFAULT_TEST_MENTOR_PORTAL_ID
+      : 100;
+
+  const users = listUsers();
+  const mentors = users.filter((user) => user.role === 'mentor');
+
+  let mentorTarget =
+    mentors.find((user) => Number(user.mentorPortalId) === targetPortalId) ||
+    mentors.find((user) => normalizeEmail(user.email) === DEFAULT_TEST_MENTOR_EMAIL) ||
+    null;
+
+  if (!mentorTarget) {
+    const passwordData = createPasswordHash(DEFAULT_TEST_MENTOR_PASSWORD);
+    mentorTarget = createUser({
+      name: DEFAULT_TEST_MENTOR_NAME || 'Future EA Pro Mentor',
+      email: DEFAULT_TEST_MENTOR_EMAIL,
+      passwordHash: passwordData.hash,
+      passwordSalt: passwordData.salt,
+      role: 'mentor',
+    });
+  }
+
+  if (!mentorTarget) {
+    return;
+  }
+
+  const mentorRows = listUsers().filter((user) => user.role === 'mentor');
+  const portalIdTakenByAnother = mentorRows.some(
+    (user) => user.id !== mentorTarget.id && Number(user.mentorPortalId) === targetPortalId
+  );
+
+  const updates = {
+    approved: true,
+    subscriptionActive: true,
+  };
+
+  if (Number(mentorTarget.licenseKeyLimit || 0) < DEFAULT_TEST_MENTOR_LICENSE_LIMIT) {
+    updates.licenseKeyLimit = DEFAULT_TEST_MENTOR_LICENSE_LIMIT;
+  }
+
+  if (!portalIdTakenByAnother && Number(mentorTarget.mentorPortalId) !== targetPortalId) {
+    updates.mentorPortalId = targetPortalId;
+  }
+
+  mentorTarget = updateUser(mentorTarget.id, updates) || mentorTarget;
+
+  const robots = listRobotsByMentor(mentorTarget.id);
+  if (!robots.length) {
+    createRobot({
+      mentorId: mentorTarget.id,
+      name: DEFAULT_TEST_ROBOT_NAME,
+      description: 'Default onboarding robot profile for mobile identity tests.',
+      category: 'Forex',
+      version: 'v1.0.0',
+      status: 'live',
+      imageUrl: '/assets/future-ea-pro-logo.svg',
+      allowedSymbols: QUOTE_SYMBOLS.slice(),
+      keyStats: {
+        uptimeHours: 0,
+        tasksCompleted: 0,
+        successRate: 0,
+        lastSync: 'Not provided',
+      },
+    });
+  }
+}
+
 function ensureDefaultThemePalette() {
   const currentTheme = getPortalTheme();
   if (!currentTheme) {
@@ -2193,7 +2989,7 @@ function buildOperatorDashboard(userId, now) {
     return null;
   }
 
-  const licenseKeys = listLicenseKeysByMentor(userId);
+  const licenseKeys = listLicenseKeysByMentor(userId).map(attachLicenseKeyDisplay);
   const clientSubscriptions = listClientSubscriptionsByMentor(userId);
   const robots = listRobotsByMentor(userId)
     .map((robot) => ({
@@ -2359,8 +3155,66 @@ function formatPreviewTitle(value) {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+function readApiPayload(req) {
+  const queryData =
+    req && req.query && typeof req.query === 'object' && !Array.isArray(req.query)
+      ? req.query
+      : {};
+  const bodyData =
+    req && req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+      ? req.body
+      : {};
+  return {
+    ...queryData,
+    ...bodyData,
+  };
+}
+
+function parseMentorPortalIdInput(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 100) {
+    return null;
+  }
+  return parsed;
+}
+
 function isClientSubscriptionBypassed(clientEmail) {
   return CLIENT_SUBSCRIPTION_BYPASS_EMAILS.includes(normalizeEmail(clientEmail));
+}
+
+function normalizeLicenseInput(rawValue) {
+  return normalizeLicenseKey(rawValue);
+}
+
+function normalizeDeviceId(rawValue) {
+  return String(rawValue || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9._:-]/g, '')
+    .slice(0, 64);
+}
+
+function getRequestDeviceId(req, fallbackValue = '') {
+  const fingerprint = `${req.ip || ''}|${req.get('user-agent') || ''}|${req.get('accept-language') || ''}`;
+  return (
+    normalizeDeviceId(fallbackValue) ||
+    crypto
+      .createHash('sha256')
+      .update(fingerprint)
+      .digest('hex')
+      .slice(0, 16)
+      .toUpperCase()
+  );
+}
+
+function attachLicenseKeyDisplay(item) {
+  if (!item) {
+    return item;
+  }
+  return {
+    ...item,
+    displayKey: formatLicenseKeyForDisplay(item.key),
+  };
 }
 
 function getClientPlan(planCode) {
@@ -2518,7 +3372,7 @@ async function sendLicenseKeyEmail(payload) {
     String(process.env.SMTP_USER || '').trim() ||
     'no-reply@futureeapro.com';
 
-  const keyText = String(payload.key || '').trim();
+  const keyText = formatLicenseKeyForDisplay(payload.key);
   const clientName = String(payload.clientName || '').trim();
   const robotName = String(payload.robotName || 'Your Expert Advisor').trim();
   const subject = `${APP_NAME} License Key - ${robotName}`;
@@ -2643,6 +3497,10 @@ function parseSymbolsInput(inputValue) {
   return symbols;
 }
 
+function makeSymbolFieldToken(symbolValue) {
+  return normalizeSymbolToken(symbolValue).replace(/[^A-Z0-9]/g, '_') || '';
+}
+
 function getMentorAvailableSymbols(robot) {
   if (!robot) {
     return QUOTE_SYMBOLS.slice();
@@ -2654,17 +3512,225 @@ function getMentorAvailableSymbols(robot) {
   return QUOTE_SYMBOLS.slice();
 }
 
+function getMentorAvailableSymbolsMap(symbols) {
+  const result = {};
+  for (const symbol of Array.isArray(symbols) ? symbols : []) {
+    const normalized = normalizeSymbolToken(symbol);
+    if (!normalized) {
+      continue;
+    }
+    result[normalized] = true;
+  }
+  return result;
+}
+
+function sanitizeSymbolConfigEntry(symbol, value) {
+  const lotSize = parseDecimalInput(
+    value && value.lotSize !== undefined ? value.lotSize : '',
+    DEFAULT_SYMBOL_CONFIG.lotSize
+  );
+  const maxTrades = toNonNegativeInteger(
+    value && value.maxTrades !== undefined ? value.maxTrades : DEFAULT_SYMBOL_CONFIG.maxTrades,
+    DEFAULT_SYMBOL_CONFIG.maxTrades
+  );
+  const direction = normalizeDirection(value && value.direction);
+  return {
+    symbol,
+    lotSize,
+    maxTrades,
+    direction: TRADE_DIRECTION_SET.has(direction) ? direction : DEFAULT_SYMBOL_CONFIG.direction,
+    createdAt: String(value && value.createdAt ? value.createdAt : new Date().toISOString()),
+  };
+}
+
+function getClientSymbolConfigMap(subscription, mentorSymbols = []) {
+  const mentorSymbolSet = new Set(
+    getMentorAvailableSymbolsFromList(mentorSymbols)
+  );
+  const rawConfig = subscription && typeof subscription.symbolConfigs === 'object'
+    ? subscription.symbolConfigs
+    : null;
+  const normalized = {};
+
+  if (rawConfig) {
+    for (const key of Object.keys(rawConfig)) {
+      const symbol = normalizeSymbolToken(key);
+      if (!symbol || !mentorSymbolSet.has(symbol)) {
+        continue;
+      }
+      normalized[symbol] = sanitizeSymbolConfigEntry(symbol, rawConfig[key]);
+    }
+  }
+
+  const legacySelectedSymbols = parseSymbolsInput(subscription && subscription.selectedSymbols);
+  for (const symbol of legacySelectedSymbols) {
+    if (!mentorSymbolSet.has(symbol) || normalized[symbol]) {
+      continue;
+    }
+    normalized[symbol] = sanitizeSymbolConfigEntry(symbol, {
+      lotSize: DEFAULT_SYMBOL_CONFIG.lotSize,
+      maxTrades: DEFAULT_SYMBOL_CONFIG.maxTrades,
+      direction: DEFAULT_SYMBOL_CONFIG.direction,
+    });
+  }
+
+  return normalized;
+}
+
+function getMentorAvailableSymbolsFromList(symbols) {
+  return parseSymbolsInput(Array.isArray(symbols) ? symbols : []);
+}
+
+function upsertClientSymbolConfigs(subscription, mentorSymbols, bodyInput) {
+  const mentorSymbolSet = new Set(getMentorAvailableSymbolsFromList(mentorSymbols));
+  const selectedSymbols = parseSymbolsInput(bodyInput && bodyInput.symbols).filter((symbol) =>
+    mentorSymbolSet.has(symbol)
+  );
+
+  const symbolConfigs = {};
+  for (const symbol of selectedSymbols) {
+    const fieldToken = makeSymbolFieldToken(symbol);
+    const lotSize = parseDecimalInput(bodyInput && bodyInput[`lotSize_${fieldToken}`], DEFAULT_SYMBOL_CONFIG.lotSize);
+    const maxTrades = toNonNegativeInteger(
+      bodyInput && bodyInput[`maxTrades_${fieldToken}`],
+      DEFAULT_SYMBOL_CONFIG.maxTrades
+    );
+    const normalizedMaxTrades = Math.max(1, maxTrades || DEFAULT_SYMBOL_CONFIG.maxTrades);
+    const direction = normalizeDirection(bodyInput && bodyInput[`direction_${fieldToken}`])
+      || DEFAULT_SYMBOL_CONFIG.direction;
+
+    symbolConfigs[symbol] = sanitizeSymbolConfigEntry(symbol, {
+      lotSize,
+      maxTrades: normalizedMaxTrades,
+      direction,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  updateClientSubscription(subscription.id, {
+    selectedSymbols,
+    symbolConfigs,
+  });
+
+  return selectedSymbols;
+}
+
+function buildExecutionSymbolRows(mentorSymbolMap, symbolConfigs, executionState = {}) {
+  const executionMap = executionState && executionState.bySymbol && typeof executionState.bySymbol === 'object'
+    ? executionState.bySymbol
+    : {};
+  const rows = [];
+  for (const [symbol, config] of Object.entries(symbolConfigs || {})) {
+    if (!mentorSymbolMap || !mentorSymbolMap[symbol]) {
+      continue;
+    }
+    const symbolExecution = executionMap[symbol] || {};
+    rows.push({
+      ...config,
+      symbol,
+      symbolConfigured: true,
+      safeToken: makeSymbolFieldToken(symbol),
+      tradeCount: Number(symbolExecution.count || 0),
+      lastExecutedAt: symbolExecution.lastExecutedAt || null,
+      lastOrderId: symbolExecution.lastOrderId || null,
+      lastDirection: symbolExecution.lastDirection || null,
+      lastStatus: symbolExecution.lastStatus || null,
+    });
+  }
+  rows.sort((a, b) => String(a.symbol || '').localeCompare(String(b.symbol || '')));
+  return rows;
+}
+
+function normalizeTradeExecutionState(rawState) {
+  const bySymbolInput = rawState && rawState.bySymbol && typeof rawState.bySymbol === 'object'
+    ? rawState.bySymbol
+    : {};
+  const bySymbol = {};
+
+  for (const symbol of Object.keys(bySymbolInput)) {
+    const normalizedSymbol = normalizeSymbolToken(symbol);
+    const value = bySymbolInput[symbol] || {};
+    if (!normalizedSymbol) {
+      continue;
+    }
+    bySymbol[normalizedSymbol] = {
+      count: Number.isFinite(Number(value.count)) ? Number(value.count) : 0,
+      lastExecutedAt: value.lastExecutedAt || null,
+      lastOrderId: value.lastOrderId || null,
+      lastDirection: value.lastDirection || null,
+      lastSymbol: normalizeSymbolToken(value.lastSymbol || normalizedSymbol),
+      lastStatus: value.lastStatus || null,
+    };
+  }
+
+  return {
+    total: Number.isFinite(Number(rawState && rawState.total)) ? Number(rawState.total) : 0,
+    bySymbol,
+  };
+}
+
+function isAllowedBrokerAssetClass(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return METATRADER_ASSET_CLASSES
+    .map((item) => String(item).trim().toLowerCase())
+    .includes(normalized);
+}
+
+function resolveBrokerName(selectedBroker, customBrokerName) {
+  if (!selectedBroker) {
+    return '';
+  }
+  const trimmed = String(selectedBroker).trim();
+  if (trimmed.toLowerCase() !== 'other / custom broker') {
+    return trimmed;
+  }
+  return String(customBrokerName || '').trim();
+}
+
+function parseDecimalInput(rawValue, fallback = DEFAULT_SYMBOL_CONFIG.lotSize) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  const normalized = Number(parsed.toFixed(4));
+  return normalized;
+}
+
+function parseTradeLevelInput(rawValue) {
+  if (rawValue === '' || rawValue === null || rawValue === undefined) {
+    return '';
+  }
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return '';
+  }
+  return String(parsed);
+}
+
+function normalizeClientRobotSection(value) {
+  const normalized = String(value || 'home')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'metrader') {
+    return 'metatrader';
+  }
+  if (CLIENT_ROBOT_SECTIONS.includes(normalized)) {
+    return normalized;
+  }
+  return 'home';
+}
+
 function getClientAllowedSymbols(subscription, mentorSymbols) {
   const symbols = parseSymbolsInput(subscription && subscription.selectedSymbols);
   if (!symbols.length) {
-    return mentorSymbols.slice();
+    return [];
   }
 
   const mentorSymbolSet = new Set(mentorSymbols);
   const filtered = symbols.filter((symbol) => mentorSymbolSet.has(symbol));
-  if (!filtered.length) {
-    return mentorSymbols.slice();
-  }
   return filtered;
 }
 
