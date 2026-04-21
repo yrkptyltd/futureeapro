@@ -14,7 +14,18 @@
     bgMediaId: 'futureeapro.client.backgroundMediaId',
     bgMediaUrl: 'futureeapro.client.backgroundMediaUrl',
     bgMediaType: 'futureeapro.client.backgroundMediaType',
+    bgMotionMode: 'futureeapro.client.backgroundMotionMode',
+    manualStyleOverride: 'futureeapro.client.manualStyleOverride',
   };
+  const AUTO_MATCH_BREAKING_ATTRIBUTES = new Set([
+    'data-face-style',
+    'data-client-theme',
+    'data-glass-style',
+    'data-font-style',
+    'data-bg-style',
+    'data-bg-motion-mode',
+    'data-bottom-shade',
+  ]);
 
   const root = document.documentElement;
   const appRoot = document.querySelector('.client-app-root');
@@ -30,6 +41,7 @@
   const applyBgMediaUrlButton = document.querySelector('[data-action="apply-background-media-url"]');
   const resetBgMediaButton = document.querySelector('[data-action="reset-background-media"]');
   const autoMatchThemeButton = document.querySelector('[data-action="auto-match-theme"]');
+  const applyBlueMortalPresetButton = document.querySelector('[data-action="apply-blue-mortal-preset"]');
 
   const SETTINGS = [
     {
@@ -76,6 +88,13 @@
       buttonElements: Array.from(document.querySelectorAll('[data-bg-style-choice]')),
     },
     {
+      attribute: 'data-bg-motion-mode',
+      key: STORAGE_KEYS.bgMotionMode,
+      fallback: 'motion',
+      valid: new Set(['motion', 'still']),
+      buttonElements: Array.from(document.querySelectorAll('[data-bg-motion-mode-choice]')),
+    },
+    {
       attribute: 'data-bottom-shade',
       key: STORAGE_KEYS.bottomShade,
       fallback: 'red',
@@ -107,6 +126,10 @@
       // Ignore storage write errors.
     }
   };
+  const hasManualStyleOverride = () => safeRead(STORAGE_KEYS.manualStyleOverride, '') === '1';
+  const markManualStyleOverride = () => {
+    safeWrite(STORAGE_KEYS.manualStyleOverride, '1');
+  };
 
   const readMediaLibrary = () => {
     if (!mediaLibraryScript) {
@@ -124,7 +147,7 @@
     }
   };
 
-  const isVideoSource = (value) => /\.(mp4|webm|ogg|m4v)(\?|#|$)/i.test(String(value || '').trim());
+  const isVideoSource = (value) => /\.(mp4|webm|ogg|m4v|mov)(\?|#|$)/i.test(String(value || '').trim());
 
   const normalizeMediaType = (typeValue, srcValue) => {
     const normalized = String(typeValue || '').trim().toLowerCase();
@@ -151,6 +174,7 @@
       src,
       poster: String(item.poster || '').trim() || src,
       themeHint: String(item.themeHint || '').trim().toLowerCase(),
+      motionHint: String(item.motionHint || item.motion || '').trim().toLowerCase(),
     };
   };
 
@@ -161,6 +185,7 @@
     button.dataset.fontStyleChoice ||
     button.dataset.textCaseChoice ||
     button.dataset.bgStyleChoice ||
+    button.dataset.bgMotionModeChoice ||
     button.dataset.bottomShadeChoice ||
     '';
 
@@ -201,6 +226,9 @@
 
     (config.selectElements || []).forEach((select) => {
       select.addEventListener('change', () => {
+        if (AUTO_MATCH_BREAKING_ATTRIBUTES.has(config.attribute)) {
+          markManualStyleOverride();
+        }
         applySetting(config, select.value);
       });
     });
@@ -208,6 +236,9 @@
     (config.buttonElements || []).forEach((button) => {
       button.addEventListener('click', () => {
         const nextValue = getButtonValue(button) || config.fallback;
+        if (AUTO_MATCH_BREAKING_ATTRIBUTES.has(config.attribute)) {
+          markManualStyleOverride();
+        }
 
         if (config.attribute === 'data-bottom-shade' && nextValue === 'custom') {
           applyCustomShade(true);
@@ -239,6 +270,10 @@
     });
 
   const toCssUrl = (value) => `url("${String(value).replace(/"/g, '\\\"')}")`;
+  const isLegacyRobotImageValue = (value) =>
+    /robot-preview-user|robot-(cobalt|orion|aurora|ember)|futureeapro-blue-mortal-kombat|futureeapro-red-master|futureeapro-test-cyber-red/i.test(
+      String(value || '').trim()
+    );
 
   const setActiveBackgroundChoice = (mediaId) => {
     bgMediaButtons.forEach((button) => {
@@ -252,8 +287,17 @@
     if (!normalized) {
       return;
     }
+    const motionMode = String(root.getAttribute('data-bg-motion-mode') || 'motion')
+      .trim()
+      .toLowerCase();
+    const isMotionEnabled = motionMode !== 'still';
 
     root.setAttribute('data-bg-media-type', normalized.type);
+    if (isMotionEnabled && normalized.motionHint) {
+      root.setAttribute('data-bg-motion', normalized.motionHint);
+    } else {
+      root.removeAttribute('data-bg-motion');
+    }
     root.style.setProperty('--client-screen-bg-image', toCssUrl(normalized.poster || normalized.src));
 
     if (bgImage) {
@@ -262,22 +306,29 @@
 
     if (bgVideo) {
       if (normalized.type === 'video') {
-        bgVideo.hidden = false;
+        if (isMotionEnabled) {
+          bgVideo.hidden = false;
 
-        if (bgVideo.getAttribute('src') !== normalized.src) {
-          bgVideo.src = normalized.src;
+          if (bgVideo.getAttribute('src') !== normalized.src) {
+            bgVideo.src = normalized.src;
+            bgVideo.load();
+          }
+
+          if (normalized.poster) {
+            bgVideo.poster = normalized.poster;
+          } else {
+            bgVideo.removeAttribute('poster');
+          }
+
+          bgVideo.play().catch(() => {
+            // Ignore autoplay restrictions.
+          });
+        } else {
+          bgVideo.pause();
+          bgVideo.hidden = true;
+          bgVideo.removeAttribute('src');
           bgVideo.load();
         }
-
-        if (normalized.poster) {
-          bgVideo.poster = normalized.poster;
-        } else {
-          bgVideo.removeAttribute('poster');
-        }
-
-        bgVideo.play().catch(() => {
-          // Ignore autoplay restrictions.
-        });
       } else {
         bgVideo.pause();
         bgVideo.hidden = true;
@@ -344,12 +395,30 @@
     }
   };
 
-  const savedRobotBg = safeRead(STORAGE_KEYS.robotBg, '');
+  const savedRobotBgRaw = safeRead(STORAGE_KEYS.robotBg, '');
+  const savedRobotBg = isLegacyRobotImageValue(savedRobotBgRaw) ? '' : savedRobotBgRaw;
+  if (savedRobotBg !== savedRobotBgRaw) {
+    safeRemove(STORAGE_KEYS.robotBg);
+  }
   applyRobotBackgroundImage(savedRobotBg || defaultRobotBg, { persist: false, syncMedia: false });
 
-  const savedMediaId = safeRead(STORAGE_KEYS.bgMediaId, '');
-  const savedCustomMediaUrl = String(safeRead(STORAGE_KEYS.bgMediaUrl, '')).trim();
+  let savedMediaId = safeRead(STORAGE_KEYS.bgMediaId, '');
+  const savedCustomMediaUrlRaw = String(safeRead(STORAGE_KEYS.bgMediaUrl, '')).trim();
+  const savedCustomMediaUrl = isLegacyRobotImageValue(savedCustomMediaUrlRaw) ? '' : savedCustomMediaUrlRaw;
   const savedCustomMediaType = safeRead(STORAGE_KEYS.bgMediaType, '');
+  if (!savedCustomMediaUrl && savedCustomMediaUrlRaw) {
+    safeRemove(STORAGE_KEYS.bgMediaUrl);
+    safeRemove(STORAGE_KEYS.bgMediaType);
+    safeRemove(STORAGE_KEYS.bgMediaId);
+    savedMediaId = '';
+  }
+
+  if (!hasManualStyleOverride() && savedMediaId && savedMediaId !== 'custom-url') {
+    // Older builds stored a default media id even when user never customized style.
+    // Clear that auto-saved value so the robot image remains the default background.
+    safeRemove(STORAGE_KEYS.bgMediaId);
+    savedMediaId = '';
+  }
 
   if (savedMediaId === 'custom-url' && savedCustomMediaUrl) {
     applyBackgroundMedia(
@@ -364,8 +433,6 @@
     );
   } else if (savedMediaId && mediaLibraryById.has(savedMediaId)) {
     applyBackgroundMedia(mediaLibraryById.get(savedMediaId), { persist: false });
-  } else if (defaultMedia) {
-    applyBackgroundMedia(defaultMedia, { persist: false });
   }
 
   bgMediaButtons.forEach((button) => {
@@ -375,7 +442,46 @@
       if (!media) {
         return;
       }
+      markManualStyleOverride();
       applyBackgroundMedia(media, { persist: true });
+    });
+  });
+
+  const resolveActiveBackgroundMedia = () => {
+    const selectedMediaId = String(safeRead(STORAGE_KEYS.bgMediaId, '')).trim();
+    if (selectedMediaId === 'custom-url') {
+      const customMediaUrl = String(safeRead(STORAGE_KEYS.bgMediaUrl, '')).trim();
+      if (customMediaUrl) {
+        return {
+          id: 'custom-url',
+          label: 'Custom URL',
+          type: normalizeMediaType(safeRead(STORAGE_KEYS.bgMediaType, ''), customMediaUrl),
+          src: customMediaUrl,
+          poster: customMediaUrl,
+        };
+      }
+    }
+
+    if (selectedMediaId && mediaLibraryById.has(selectedMediaId)) {
+      return mediaLibraryById.get(selectedMediaId);
+    }
+
+    return (
+      defaultMedia || {
+        id: 'robot-default',
+        label: 'Robot Default',
+        type: 'image',
+        src: defaultRobotBg,
+        poster: defaultRobotBg,
+      }
+    );
+  };
+
+  Array.from(document.querySelectorAll('[data-bg-motion-mode-choice]')).forEach((button) => {
+    button.addEventListener('click', () => {
+      window.requestAnimationFrame(() => {
+        applyBackgroundMedia(resolveActiveBackgroundMedia(), { persist: false });
+      });
     });
   });
 
@@ -385,6 +491,7 @@
       if (!value) {
         return;
       }
+      markManualStyleOverride();
       applyBackgroundMedia(
         {
           id: 'custom-url',
@@ -407,18 +514,21 @@
         src: defaultRobotBg,
         poster: defaultRobotBg,
       };
+      markManualStyleOverride();
       applyBackgroundMedia(baseMedia, { persist: true });
     });
   }
 
   if (applyBgButton && bgInput) {
     applyBgButton.addEventListener('click', () => {
+      markManualStyleOverride();
       applyRobotBackgroundImage(bgInput.value, { persist: true });
     });
   }
 
   if (resetBgButton) {
     resetBgButton.addEventListener('click', () => {
+      markManualStyleOverride();
       applyRobotBackgroundImage(defaultRobotBg, { persist: true });
     });
   }
@@ -436,6 +546,7 @@
         if (!result) {
           return;
         }
+        markManualStyleOverride();
         applyRobotBackgroundImage(result, { persist: true });
       };
       reader.readAsDataURL(file);
@@ -674,7 +785,44 @@
 
   if (applyCustomShadeButton) {
     applyCustomShadeButton.addEventListener('click', () => {
+      markManualStyleOverride();
       applyCustomShade(true);
+    });
+  }
+
+  const applyBlueMortalPreset = () => {
+    const themeConfig = settingByAttribute['data-client-theme'];
+    const faceConfig = settingByAttribute['data-face-style'];
+    const bgStyleConfig = settingByAttribute['data-bg-style'];
+    const bottomShadeConfig = settingByAttribute['data-bottom-shade'];
+
+    if (themeConfig) {
+      applySetting(themeConfig, 'blue', { persist: true });
+    }
+    if (faceConfig) {
+      applySetting(faceConfig, 'super-pill', { persist: true });
+    }
+    if (bgStyleConfig) {
+      applySetting(bgStyleConfig, 'off', { persist: true });
+    }
+    if (bottomShadeConfig) {
+      applySetting(bottomShadeConfig, 'blue', { persist: true });
+    }
+
+    const preferredBlueMedia =
+      mediaLibraryById.get('blue-mortal-motion') ||
+      mediaLibraryById.get('blue-mortal-motion-alt') ||
+      mediaLibrary.find((item) => item.type === 'video' && item.themeHint === 'blue');
+
+    if (preferredBlueMedia) {
+      applyBackgroundMedia(preferredBlueMedia, { persist: true });
+    }
+  };
+
+  if (applyBlueMortalPresetButton) {
+    applyBlueMortalPresetButton.addEventListener('click', () => {
+      markManualStyleOverride();
+      applyBlueMortalPreset();
     });
   }
 
@@ -749,9 +897,16 @@
 
   if (autoMatchThemeButton) {
     autoMatchThemeButton.addEventListener('click', () => {
+      markManualStyleOverride();
       applyAutoMatchFromRobotImage().catch(() => {
         // Ignore matching errors for cross-origin sources.
       });
+    });
+  }
+
+  if (!hasManualStyleOverride()) {
+    applyAutoMatchFromRobotImage().catch(() => {
+      // Ignore auto-match errors for blocked images.
     });
   }
 })();

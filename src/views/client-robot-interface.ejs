@@ -5,7 +5,8 @@
     home: 'Home',
     quotes: 'Quotes',
     trade: 'Trade',
-    metrader: 'Metrader',
+    scanner: 'Scanner',
+    metatrader: 'MetaTrader',
     details: 'Details',
     settings: 'Settings',
   };
@@ -57,12 +58,13 @@
     <p class="hint">License Key: <code><%= subscription.licenseKey %></code></p>
 
     <nav class="client-drawer-nav">
-      <a href="/client/robot/<%= subscription.id %>?section=home" class="side-menu-item <%= activeSection === 'home' ? 'active' : '' %>">Home</a>
-      <a href="/client/robot/<%= subscription.id %>?section=quotes" class="side-menu-item <%= activeSection === 'quotes' ? 'active' : '' %>">Quotes</a>
-      <a href="/client/robot/<%= subscription.id %>?section=trade" class="side-menu-item <%= activeSection === 'trade' ? 'active' : '' %>">Trade</a>
-      <a href="/client/robot/<%= subscription.id %>?section=metrader" class="side-menu-item <%= activeSection === 'metrader' ? 'active' : '' %>">Metrader</a>
-      <a href="/client/robot/<%= subscription.id %>?section=details" class="side-menu-item <%= activeSection === 'details' ? 'active' : '' %>">Details</a>
-      <a href="/client/robot/<%= subscription.id %>?section=settings" class="side-menu-item <%= activeSection === 'settings' ? 'active' : '' %>">Settings</a>
+      <a href="/client/robot/<%= subscription.id %>?section=home" data-client-nav-link class="side-menu-item <%= activeSection === 'home' ? 'active' : '' %>">Home</a>
+      <a href="/client/robot/<%= subscription.id %>?section=quotes" data-client-nav-link class="side-menu-item <%= activeSection === 'quotes' ? 'active' : '' %>">Quotes</a>
+      <a href="/client/robot/<%= subscription.id %>?section=trade" data-client-nav-link class="side-menu-item <%= activeSection === 'trade' ? 'active' : '' %>">Trade</a>
+      <a href="/client/robot/<%= subscription.id %>?section=scanner" data-client-nav-link class="side-menu-item <%= activeSection === 'scanner' ? 'active' : '' %>">Chart Scanner</a>
+      <a href="/client/robot/<%= subscription.id %>?section=metatrader" data-client-nav-link class="side-menu-item <%= activeSection === 'metatrader' ? 'active' : '' %>">MetaTrader</a>
+      <a href="/client/robot/<%= subscription.id %>?section=details" data-client-nav-link class="side-menu-item <%= activeSection === 'details' ? 'active' : '' %>">Details</a>
+      <a href="/client/robot/<%= subscription.id %>?section=settings" data-client-nav-link class="side-menu-item <%= activeSection === 'settings' ? 'active' : '' %>">Settings</a>
     </nav>
 
     <p class="hint">MT4 / MT5 brokers supported, including Razor Markets.</p>
@@ -85,46 +87,49 @@
       </article>
 
       <article class="home-action-panel">
-        <button type="button" class="home-action-btn" data-go-section="quotes">
+        <button type="button" class="home-action-btn action-quotes" data-go-section="quotes">
           <span class="action-icon">↗</span>
           <span class="action-label">Quotes</span>
         </button>
-        <button type="button" class="home-action-btn action-main-btn" data-action="pause-robot" data-main-robot-action>
-          <span class="action-icon action-icon-main" data-main-robot-icon>■</span>
+        <button type="button" class="home-action-btn action-trade action-main-btn" data-action="pause-robot" data-main-robot-action>
+          <span class="action-icon action-icon-main" data-main-robot-icon>▶</span>
           <span class="action-label" data-main-robot-label>Stop</span>
         </button>
-        <button type="button" class="home-action-btn" data-action="remove-robot">
-          <span class="action-icon">⌫</span>
+        <button type="button" class="home-action-btn action-remove" data-action="remove-robot">
+          <span class="action-icon action-icon-remove">╳</span>
           <span class="action-label">Remove</span>
         </button>
       </article>
 
       <p class="powered-by">Powered by <strong>Future EA Pro</strong></p>
 
-      <article class="home-list-card">
-        <img src="<%= robotImage %>" alt="<%= robotName %> icon" class="home-list-avatar" />
-        <div>
-          <p class="home-list-title"><%= robotName %></p>
-          <p class="home-list-sub running" data-robot-running-copy>Running</p>
-        </div>
-      </article>
+      <section class="home-status-stack">
+        <p class="home-section-title">Robot Snapshot</p>
+        <article class="home-list-card">
+          <img src="<%= robotImage %>" alt="<%= robotName %> icon" class="home-list-avatar" />
+          <div>
+            <p class="home-card-title"><%= robotName %></p>
+            <p class="home-card-subtitle running" data-robot-running-copy>Active and ready</p>
+          </div>
+        </article>
 
-      <article class="home-list-card minimal">
-        <div class="home-list-icon">📊</div>
-        <div>
-          <p class="home-list-title">Chart Scanner</p>
-          <p class="home-list-sub">AI-powered trade analysis</p>
-        </div>
-        <img src="<%= robotImage %>" alt="<%= robotName %> badge" class="home-card-badge-avatar" />
-      </article>
+        <p class="home-section-title">Available Modules</p>
+        <button type="button" class="home-list-card minimal home-list-card-button" data-go-section="scanner">
+          <div class="home-list-icon">📊</div>
+          <div>
+            <p class="home-card-title">Chart Scanner</p>
+            <p class="home-card-subtitle">AI-powered scan and signal prep</p>
+          </div>
+        </button>
 
-      <article class="home-list-card minimal">
-        <div class="home-list-icon">＋</div>
-        <div>
-          <p class="home-list-title">Add a New EA</p>
-          <p class="home-list-sub">Have a valid license key</p>
-        </div>
-      </article>
+        <article class="home-list-card minimal">
+          <div class="home-list-icon">＋</div>
+          <div>
+            <p class="home-card-title">Add a New EA</p>
+            <p class="home-card-subtitle">Unlock with a valid license key</p>
+          </div>
+        </article>
+      </section>
     </section>
     <% } %>
 
@@ -153,21 +158,46 @@
         <form action="/client/robot/<%= subscription.id %>/symbols/allowed" method="POST" class="stack-form">
           <div class="quotes-list">
             <% quoteRows.forEach((quote) => { %>
-            <label class="quote-select-card">
+            <label class="quote-select-card" data-symbol-config-row data-symbol-token="<%= quote.safeToken %>">
               <span class="quote-select-input-wrap">
                 <input
                   type="checkbox"
                   name="symbols"
                   value="<%= quote.symbol %>"
-                  <%= selectedSymbolsLookup[quote.symbol] ? 'checked' : '' %>
+                  <%= selectedSymbolLookup && selectedSymbolLookup[quote.symbol] ? 'checked' : '' %>
                 />
               </span>
               <article class="quote-card">
                 <p class="quote-symbol"><%= quote.symbol %></p>
                 <div class="quote-meta-row">
-                  <p><span class="hint">Lot Size</span><br /><strong><%= quote.lotSize %></strong></p>
-                  <p><span class="hint">Platform</span><br /><strong><%= quote.platform %></strong></p>
-                  <p><span class="hint">Direction</span><br /><strong class="quote-buy"><%= quote.direction %></strong></p>
+                  <label>
+                    <span class="hint">Lot Size</span>
+                    <input
+                      type="number"
+                      name="lotSize_<%= quote.safeToken %>"
+                      min="0.01"
+                      step="0.01"
+                      value="<%= quote.lotSize %>"
+                    />
+                  </label>
+                  <label>
+                    <span class="hint">Max Trades</span>
+                    <input
+                      type="number"
+                      name="maxTrades_<%= quote.safeToken %>"
+                      min="1"
+                      step="1"
+                      value="<%= quote.maxTrades %>"
+                    />
+                  </label>
+                  <label>
+                    <span class="hint">Direction</span>
+                    <select name="direction_<%= quote.safeToken %>">
+                      <option value="BUY" <%= String(quote.direction || '').trim().toUpperCase() === 'BUY' ? 'selected' : '' %>>BUY</option>
+                      <option value="SELL" <%= String(quote.direction || '').trim().toUpperCase() === 'SELL' ? 'selected' : '' %>>SELL</option>
+                      <option value="BOTH" <%= String(quote.direction || '').trim().toUpperCase() === 'BOTH' ? 'selected' : '' %>>BOTH</option>
+                    </select>
+                  </label>
                 </div>
               </article>
             </label>
@@ -187,7 +217,7 @@
             <p class="quote-symbol"><%= quote.symbol %></p>
             <div class="quote-meta-row">
               <p><span class="hint">Lot Size</span><br /><strong><%= quote.lotSize %></strong></p>
-              <p><span class="hint">Platform</span><br /><strong><%= quote.platform %></strong></p>
+              <p><span class="hint">Max Trades</span><br /><strong><%= quote.maxTrades %></strong></p>
               <p><span class="hint">Direction</span><br /><strong class="quote-buy"><%= quote.direction %></strong></p>
             </div>
           </article>
@@ -203,11 +233,125 @@
       <article class="panel">
         <h2>Trade</h2>
         <p class="hint">Start or pause robot execution, then launch quick controls from the floating icon.</p>
-        <div class="cta-row">
-          <button class="button" data-action="start-robot">Start Robot</button>
-          <button class="button" data-action="pause-robot">Pause Robot</button>
-          <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button secondary">Open Quotes</a>
+        <div class="trade-action-stack">
+          <button class="button trade-control-btn trade-start" data-action="start-robot">
+            <span class="trade-control-icon">▶</span>
+            <span class="trade-control-copy">
+              <strong>Start Robot</strong>
+              <small>Enable live execution now</small>
+            </span>
+          </button>
+          <button class="button trade-control-btn trade-pause" data-action="pause-robot">
+            <span class="trade-control-icon">⏸</span>
+            <span class="trade-control-copy">
+              <strong>Pause Robot</strong>
+              <small>Pause and hold new orders</small>
+            </span>
+          </button>
+          <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button trade-control-btn trade-quote secondary">
+            <span class="trade-control-icon">☰</span>
+            <span class="trade-control-copy">
+              <strong>Open Quotes</strong>
+              <small>Review quick symbol snapshots</small>
+            </span>
+          </a>
         </div>
+      </article>
+
+        <article class="panel">
+        <h2>Execute Trade</h2>
+        <p class="hint">Choose a configured symbol and execute via your connected broker.</p>
+        <form action="/client/robot/<%= subscription.id %>/trade/execute" method="POST" class="stack-form">
+          <label>
+            Symbol
+            <select name="symbol" required>
+              <option value="">Choose symbol</option>
+              <% executionSymbolRows.forEach((row) => { %>
+              <option
+                value="<%= row.symbol %>"
+                data-default-lot-size="<%= row.lotSize %>"
+                data-max-trades="<%= row.maxTrades %>"
+                data-direction="<%= row.direction %>"
+              >
+                <%= row.symbol %> (lot <%= row.lotSize %>, max <%= row.maxTrades %>, dir <%= row.direction %>)
+              </option>
+              <% }) %>
+            </select>
+          </label>
+
+          <div class="row-fields">
+            <label>
+              Platform
+              <select name="platform">
+                <option value="MT5">MT5</option>
+                <option value="MT4">MT4</option>
+              </select>
+            </label>
+            <label>
+              Direction
+              <select name="direction">
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row-fields">
+            <label>
+              Lot Size
+              <input type="number" name="lotSize" min="0.01" step="0.01" />
+            </label>
+            <label>
+              Max Trades
+              <input type="text" value="<%= executionSymbolRows[0] ? executionSymbolRows[0].maxTrades : '' %>" readonly />
+            </label>
+          </div>
+
+          <div class="row-fields">
+            <label>
+              Stop Loss
+              <input type="number" name="stopLoss" inputmode="decimal" step="0.00001" placeholder="Optional" />
+            </label>
+            <label>
+              Take Profit
+              <input type="number" name="takeProfit" inputmode="decimal" step="0.00001" placeholder="Optional" />
+            </label>
+          </div>
+
+          <button type="submit" class="button">Execute Trade</button>
+        </form>
+
+        <p class="hint">
+          Total executions: <strong><%= executionState && executionState.total ? executionState.total : 0 %></strong>
+        </p>
+        <% if (!executionSymbolRows.length) { %>
+        <p class="hint">Configure allowed symbols first, then execute from this form.</p>
+        <% } else { %>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Direction</th>
+                <th>Last Order</th>
+                <th>Executed</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% executionSymbolRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.symbol %></td>
+                <td><%= row.direction %></td>
+                <td><%= row.lastOrderId || '-' %></td>
+                <td><%= row.tradeCount || 0 %> / <%= row.maxTrades %></td>
+                <td><%= row.lastStatus || 'idle' %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
       </article>
 
       <article class="panel">
@@ -222,7 +366,96 @@
     </section>
     <% } %>
 
-    <% if (activeSection === 'metrader') { %>
+    <% if (activeSection === 'scanner') { %>
+    <section class="client-screen scanner-screen">
+      <article class="panel scanner-upload-panel">
+        <h2>Chart Scanner</h2>
+        <p class="hint">Upload a chart screenshot, analyze direction, then execute directly on MT4/MT5.</p>
+        <% const scannerCanExecute = executionSymbolRows.length > 0; %>
+
+        <label class="upload-field">
+          Upload Chart Screenshot
+          <input type="file" accept="image/*" data-chart-file-input />
+        </label>
+
+        <div class="scanner-preview-card" data-chart-preview-card>
+          <img src="" alt="Chart preview" data-chart-preview hidden />
+          <div class="scanner-preview-placeholder" data-chart-preview-placeholder>
+            <p>Upload chart screenshot to preview here</p>
+          </div>
+        </div>
+
+        <div class="row-fields">
+          <label>
+            Symbol
+            <select data-chart-symbol>
+              <% const scannerSymbolRows = executionSymbolRows.length ? executionSymbolRows : quoteRows; %>
+              <% scannerSymbolRows.forEach((row) => { %>
+              <option
+                value="<%= row.symbol %>"
+                <%= chartScannerState && chartScannerState.symbol === row.symbol ? 'selected' : '' %>
+              >
+                <%= row.symbol %>
+              </option>
+              <% }) %>
+            </select>
+          </label>
+          <label>
+            Platform
+            <select data-chart-platform>
+              <option value="MT5">MT5</option>
+              <option value="MT4">MT4</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="cta-row">
+          <button
+            type="button"
+            class="button"
+            data-action="analyze-chart"
+            data-subscription-id="<%= subscription.id %>"
+          >
+            Analyze Chart
+          </button>
+        </div>
+        <% if (!scannerCanExecute) { %>
+        <p class="hint">Save Allowed Symbols in Quotes first before executing scanner trades.</p>
+        <% } %>
+      </article>
+
+      <article class="panel scanner-result-panel" data-chart-result-panel>
+        <h3>Scanner Result</h3>
+        <div class="summary-list scanner-summary-grid">
+          <p><strong>Direction:</strong> <span data-chart-direction><%= chartScannerState ? chartScannerState.direction : '-' %></span></p>
+          <p><strong>Stop Loss:</strong> <span data-chart-sl><%= chartScannerState ? chartScannerState.stopLoss : '-' %></span></p>
+          <p><strong>Take Profit:</strong> <span data-chart-tp><%= chartScannerState ? chartScannerState.takeProfit : '-' %></span></p>
+          <p><strong>Confidence:</strong> <span data-chart-confidence><%= chartScannerState ? `${chartScannerState.confidence}%` : '-' %></span></p>
+          <p><strong>Fingerprint:</strong> <span data-chart-fingerprint><%= chartScannerState && chartScannerState.fingerprint ? chartScannerState.fingerprint : '-' %></span></p>
+          <p><strong>Analyzed:</strong> <span data-chart-analyzed-at><%= chartScannerState && chartScannerState.analyzedAt ? new Date(chartScannerState.analyzedAt).toLocaleString() : '-' %></span></p>
+        </div>
+        <p class="hint" data-chart-message>
+          <%= scannerCanExecute
+            ? (chartScannerState ? 'Scanner ready. Execute when your broker connection is active.' : 'Upload screenshot to start scanner analysis.')
+            : 'Configure Allowed Symbols in Quotes first, then execute scanner trades.' %>
+        </p>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="button"
+            data-action="execute-chart-trade"
+            data-subscription-id="<%= subscription.id %>"
+            data-scanner-can-execute="<%= scannerCanExecute ? '1' : '0' %>"
+            <%= chartScannerState && scannerCanExecute ? '' : 'disabled' %>
+          >
+            Execute Trade
+          </button>
+        </div>
+      </article>
+    </section>
+    <% } %>
+
+    <% if (activeSection === 'metatrader') { %>
     <section class="client-screen metrader-screen">
       <article class="panel">
         <div class="platform-tabs" data-platform-tabs>
@@ -230,11 +463,18 @@
           <button type="button" class="tab-pill" data-platform-choice="MT4">MT4 ACCOUNT</button>
         </div>
 
-        <p class="platform-status"><span class="status-dot"></span><span data-platform-status-label>MT5 CONNECTED</span></p>
+        <p class="platform-status">
+          <span class="status-dot <%= metatraderConnectionStatus && metatraderConnectionStatus.status === 'connected' ? '' : 'off' %>"></span>
+          <span data-platform-status-label>
+            <%= metatraderConnectionStatus
+              ? `${metatraderConnectionStatus.platform} ${metatraderConnectionStatus.status}`
+              : 'No active MT connection' %>
+          </span>
+        </p>
 
         <h2 class="mt-login-heading" data-platform-login-title>MT5 LOGIN DETAILS</h2>
 
-        <form action="/client/robot/<%= subscription.id %>/metrader/connect" method="POST" class="stack-form">
+        <form action="/client/robot/<%= subscription.id %>/metatrader/connect" method="POST" class="stack-form">
           <input type="hidden" name="platform" value="MT5" data-platform-input />
 
           <label>
@@ -253,7 +493,7 @@
 
           <label>
             Password
-            <input type="password" name="notes" placeholder="Optional in preview" />
+            <input type="password" name="password" placeholder="Enter password" required />
           </label>
 
           <label>
@@ -262,6 +502,16 @@
           </label>
 
           <label>
+            Asset Class
+            <select name="assetClass" required>
+              <option value="" disabled selected>Choose asset class</option>
+              <% brokerAssetClasses.forEach((assetClass) => { %>
+              <option value="<%= assetClass %>"><%= assetClass %></option>
+              <% }) %>
+            </select>
+          </label>
+
+          <label data-custom-broker-row>
             Custom Broker Name (if selected custom)
             <input type="text" name="customBrokerName" placeholder="Enter broker name" />
           </label>
@@ -307,7 +557,7 @@
         <p class="hint">No broker connections yet.</p>
         <% } else { %>
         <div class="table-wrap">
-          <table>
+        <table>
             <thead>
               <tr>
                 <th>Platform</th>
@@ -324,11 +574,11 @@
                 <td><%= connection.brokerName %></td>
                 <td><%= connection.accountNumber %></td>
                 <td><%= connection.serverName %></td>
-                <td><span class="pill ok"><%= connection.status || 'connected' %></span></td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
+                <td><span class="pill <%= String(connection.status || '').toLowerCase() === 'connected' ? 'ok' : 'off' %>"><%= connection.status || 'connected' %></span></td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
         </div>
         <% } %>
       </article>
@@ -454,26 +704,30 @@
       </article>
 
       <article class="panel">
+        <h3>Preset Packs</h3>
+        <p class="hint">Optional one-tap styling. Your default launch style stays unchanged until you apply one.</p>
+        <div class="cta-row">
+          <button type="button" class="button mini secondary" data-action="apply-blue-mortal-preset">
+            Apply Blue Mortal Pack
+          </button>
+        </div>
+      </article>
+
+      <article class="panel">
         <h3>Animated Backgrounds</h3>
-        <p class="hint">Choose moving videos or still images for your robot app.</p>
-        <div class="bg-media-grid">
-          <% mediaLibrary.forEach((media) => { %>
+        <p class="hint">Choose one background style.</p>
+        <div class="option-chip-grid">
+          <button type="button" class="option-chip active" data-bg-motion-mode-choice="motion">Motion</button>
+          <button type="button" class="option-chip" data-bg-motion-mode-choice="still">Still</button>
+        </div>
+        <div class="option-chip-grid bg-media-simple-list">
+          <% mediaLibrary.forEach((media, index) => { %>
           <button
             type="button"
-            class="bg-media-choice"
+            class="option-chip bg-media-simple-btn"
             data-bg-media-choice="<%= media.id %>"
           >
-            <span class="bg-media-thumb">
-              <% if (media.type === 'video') { %>
-              <video src="<%= media.src %>" muted playsinline loop preload="metadata" poster="<%= media.poster || '' %>"></video>
-              <% } else { %>
-              <img src="<%= media.poster || media.src %>" alt="<%= media.label %>" loading="lazy" />
-              <% } %>
-            </span>
-            <span class="bg-media-copy">
-              <strong><%= media.label %></strong>
-              <small><%= media.type === 'video' ? 'Animated' : 'Still image' %></small>
-            </span>
+            Background <%= index + 1 %>
           </button>
           <% }) %>
         </div>
@@ -524,6 +778,7 @@
 </section>
 
 <script id="client-media-library" type="application/json"><%- JSON.stringify(mediaLibrary) %></script>
+<script id="chart-scanner-initial" type="application/json"><%- JSON.stringify(chartScannerState || null) %></script>
 <script src="/client-face.js" defer></script>
 <script src="/client-robot-interface.js" defer></script>
 
@@ -549,11 +804,12 @@
     <button type="button" id="robot-floating-close" class="robot-float-close" aria-label="Close robot menu">x</button>
   </div>
 
-  <div class="robot-float-actions">
-    <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button mini">Quotes</a>
-    <a href="/client/robot/<%= subscription.id %>?section=trade" class="button mini">Trade</a>
-    <a href="/client/robot/<%= subscription.id %>?section=metrader" class="button mini">Brokers</a>
+    <div class="robot-float-actions">
+      <a href="/client/robot/<%= subscription.id %>?section=quotes" class="button mini">Quotes</a>
+      <a href="/client/robot/<%= subscription.id %>?section=trade" class="button mini">Trade</a>
+      <a href="/client/robot/<%= subscription.id %>?section=scanner" class="button mini">Scanner</a>
+      <a href="/client/robot/<%= subscription.id %>?section=metatrader" class="button mini">Brokers</a>
+    </div>
   </div>
-</div>
 
 <%- include('partials/bottom') %>

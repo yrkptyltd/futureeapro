@@ -63,6 +63,9 @@ const DEFAULT_TEST_MENTOR_NAME = String(
 ).trim();
 const DEFAULT_TEST_MENTOR_PASSWORD = process.env.DEFAULT_TEST_MENTOR_PASSWORD || 'Mentor100@Future';
 const DEFAULT_TEST_MENTOR_LICENSE_LIMIT = 1000;
+const DEFAULT_TEST_CLIENT_EMAIL = normalizeEmail(
+  process.env.DEFAULT_TEST_CLIENT_EMAIL || 'nhlanhlamashapa11@gmail.com'
+);
 const DEFAULT_TEST_ROBOT_NAME = 'Future EA Pro Core';
 const parsedUsdExchangeRate = Number(process.env.USD_EXCHANGE_RATE || 18.5);
 const USD_EXCHANGE_RATE =
@@ -100,7 +103,7 @@ const LICENSE_KEY_DURATIONS = {
   lifetime: { code: 'lifetime', label: 'Lifetime (∞)', mode: 'lifetime', value: 0 },
 };
 const LICENSE_KEY_DURATION_LIST = Object.values(LICENSE_KEY_DURATIONS);
-const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'metatrader', 'details', 'settings'];
+const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'scanner', 'metatrader', 'details', 'settings'];
 const QUOTE_SYMBOLS = [
   '.DER30.',
   '.UK100.',
@@ -162,12 +165,17 @@ const TRADE_EXECUTION_FIELD_LABELS = {
   lastStatus: 'lastStatus',
 };
 const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.svg'];
+const TEST_LADY_ROBOT_IMAGE_URL = '/assets/robots/futureeapro-test-lady-cyber.jpg';
 const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
 const LEGACY_ROBOT_NAME_PATTERN = /algo\s*nova\s*ea\s*v?6/i;
+const LEGACY_TEST_REPLACEMENT_IMAGE_PATTERNS = [
+  /futureeapro-test-cyber-red/i,
+  /futureeapro-blue-mortal-kombat/i,
+  /futureeapro-red-master/i,
+];
 const FORBIDDEN_ROBOT_IMAGE_PATTERNS = [
   /robot-preview-user/i,
-  /b287272d-29f2-4670-9026-359dff57c5e6/i,
   /futureeapro-red-master/i,
   /robot-(cobalt|orion|aurora|ember)/i,
   /futureeapro-blue-mortal-kombat/i,
@@ -200,7 +208,7 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
     label: 'Neon Flux Motion',
     type: 'video',
     src: '/assets/background-videos/future-theme-01.mp4',
-    poster: '/assets/backgrounds/future-theme-style-reference.jpg',
+    poster: '/assets/backgrounds/future-theme-smoke-dual-neon.jpg',
     themeHint: 'red',
   },
   {
@@ -212,6 +220,14 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
     themeHint: 'purple',
   },
   {
+    id: 'uploaded-video-03',
+    label: 'Custom Mentor Motion',
+    type: 'video',
+    src: '/assets/background-videos/future-theme-upload-03.mov',
+    poster: '/assets/backgrounds/future-theme-smoke-dual-neon.jpg',
+    themeHint: 'red',
+  },
+  {
     id: 'uploaded-image-01',
     label: 'Red Matrix Motion',
     type: 'image',
@@ -220,11 +236,36 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
     themeHint: 'red',
   },
   {
-    id: 'uploaded-image-02',
-    label: 'Cortex Reference',
+    id: 'uploaded-image-03',
+    label: 'Dual Neon Smoke',
     type: 'image',
-    src: '/assets/backgrounds/future-theme-style-reference.jpg',
-    poster: '/assets/backgrounds/future-theme-style-reference.jpg',
+    src: '/assets/backgrounds/future-theme-smoke-dual-neon.jpg',
+    poster: '/assets/backgrounds/future-theme-smoke-dual-neon.jpg',
+    themeHint: 'blue',
+  },
+  {
+    id: 'uploaded-image-04',
+    label: 'Moon Samurai Drift',
+    type: 'image',
+    src: '/assets/backgrounds/future-theme-moon-samurai.jpg',
+    poster: '/assets/backgrounds/future-theme-moon-samurai.jpg',
+    themeHint: 'red',
+    motionHint: 'cloud-drift',
+  },
+  {
+    id: 'uploaded-image-05',
+    label: 'Blue Fluid Wallpaper',
+    type: 'image',
+    src: '/assets/backgrounds/future-theme-blue-fluid-wallpaper.jpg',
+    poster: '/assets/backgrounds/future-theme-blue-fluid-wallpaper.jpg',
+    themeHint: 'blue',
+  },
+  {
+    id: 'uploaded-image-06',
+    label: 'Green Crystal',
+    type: 'image',
+    src: '/assets/backgrounds/future-theme-green-crystal.jpg',
+    poster: '/assets/backgrounds/future-theme-green-crystal.jpg',
     themeHint: 'green',
   },
 ];
@@ -342,13 +383,14 @@ ensureMentorPortalIds();
 ensureDefaultThemePalette();
 bootstrapSuperhost();
 bootstrapDefaultMentorAccount();
+bootstrapDefaultBypassLicenseKey();
 migrateLegacyRobotImages();
 migrateLegacyRobotNames();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/previews', express.static(path.join(__dirname, '..', 'previews')));
@@ -1210,6 +1252,7 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     selected: true,
   }));
   const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
+  const chartScannerState = normalizeChartScannerState(subscription.chartScanner);
   const activeBrokerConnection = getActiveBrokerConnection(brokerConnections, 'MT5');
   const selectedSymbolLookup = Object.create(null);
   for (const symbol of Object.keys(symbolConfigs)) {
@@ -1242,6 +1285,7 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     symbolConfigs,
     defaultSymbolConfigs: DEFAULT_SYMBOL_CONFIG,
     executionState,
+    chartScannerState,
     executionSymbolRows: buildExecutionSymbolRows(availableSymbolMap, symbolConfigs, executionState),
     tradeExecutionMessage: '',
   });
@@ -1373,6 +1417,196 @@ function handleClientMetaTraderConnect(req, res) {
 
 app.post('/client/robot/:subscriptionId/metatrader/connect', handleClientMetaTraderConnect);
 app.post('/client/robot/:subscriptionId/metrader/connect', handleClientMetaTraderConnect);
+
+app.post('/client/robot/:subscriptionId/scanner/analyze', (req, res) => {
+  const subscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!subscription) {
+    return res.status(404).json({ ok: false, message: 'Robot session not found.' });
+  }
+
+  if (!isSubscriptionActiveNow(subscription, new Date())) {
+    return res.status(403).json({ ok: false, message: 'Subscription expired. Please renew your plan.' });
+  }
+
+  const body = req.body || {};
+  const imageData = String(body.imageData || '').trim();
+  if (!imageData) {
+    return res.status(400).json({ ok: false, message: 'Upload a chart screenshot first.' });
+  }
+
+  const mentor = getUserById(subscription.mentorId);
+  const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
+  const robotName = sanitizeRobotName(featuredRobot ? featuredRobot.name : DEFAULT_ROBOT_NAME);
+  const mentorSymbols = getMentorAvailableSymbols(featuredRobot);
+  const symbolConfigs = getClientSymbolConfigMap(subscription, mentorSymbols);
+  const allowedSymbols = Object.keys(symbolConfigs);
+  const requestedSymbol = normalizeSymbolToken(body.symbol || '');
+  const symbol =
+    (requestedSymbol && symbolConfigs[requestedSymbol] && requestedSymbol) ||
+    allowedSymbols[0] ||
+    mentorSymbols[0] ||
+    'EURUSD';
+  const trimmedImageData = imageData.length > 280000 ? imageData.slice(0, 280000) : imageData;
+  const analysis = buildChartScannerAnalysis({
+    imageData: trimmedImageData,
+    symbol,
+    robotName,
+  });
+
+  updateClientSubscription(subscription.id, {
+    chartScanner: {
+      analysis,
+      analyzedAt: analysis.analyzedAt,
+      status: 'ready',
+    },
+  });
+
+  return res.json({ ok: true, analysis });
+});
+
+app.post('/client/robot/:subscriptionId/scanner/execute', async (req, res) => {
+  const subscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!subscription) {
+    return res.status(404).json({ ok: false, message: 'Robot session not found.' });
+  }
+
+  if (!isSubscriptionActiveNow(subscription, new Date())) {
+    return res.status(403).json({ ok: false, message: 'Subscription expired. Please renew your plan.' });
+  }
+
+  const body = req.body || {};
+  const scannerState = normalizeChartScannerState(subscription.chartScanner);
+  const mentor = getUserById(subscription.mentorId);
+  const mentorRobots = mentor ? listRobotsByMentor(mentor.id) : [];
+  const featuredRobot = pickSubscriptionRobot(
+    subscription,
+    mentorRobots,
+    mentor ? mentor.id : subscription.mentorId
+  );
+  const robotName = sanitizeRobotName(featuredRobot ? featuredRobot.name : DEFAULT_ROBOT_NAME);
+  const mentorSymbols = getMentorAvailableSymbols(featuredRobot);
+  const symbolConfigs = getClientSymbolConfigMap(subscription, mentorSymbols);
+  const requestedSymbol = normalizeSymbolToken(
+    body.symbol || (scannerState && scannerState.symbol) || ''
+  );
+  const configuredSymbols = Object.keys(symbolConfigs);
+  const symbol =
+    (requestedSymbol && symbolConfigs[requestedSymbol] && requestedSymbol) ||
+    configuredSymbols[0] ||
+    '';
+  if (!symbol) {
+    return res.status(400).json({ ok: false, message: 'No configured symbol found. Configure Allowed Symbols first.' });
+  }
+
+  const symbolConfig = symbolConfigs[symbol];
+  if (!symbolConfig) {
+    return res.status(400).json({ ok: false, message: 'Symbol is not allowed for this robot.' });
+  }
+
+  const platform = normalizePlatform(body.platform || 'MT5');
+  const requestedDirection = normalizeDirection(
+    body.direction || (scannerState && scannerState.direction) || ''
+  );
+  if (!requestedDirection) {
+    return res.status(400).json({ ok: false, message: 'Scanner direction is missing. Analyze chart first.' });
+  }
+
+  const maxTrades = toNonNegativeInteger(symbolConfig.maxTrades, 0);
+  const normalizedDirection =
+    symbolConfig.direction === 'BOTH' ? requestedDirection : symbolConfig.direction;
+  if (symbolConfig.direction !== 'BOTH' && normalizedDirection !== requestedDirection) {
+    return res.status(400).json({
+      ok: false,
+      message: `Direction not allowed for ${symbol}. Allowed: ${symbolConfig.direction}.`,
+    });
+  }
+
+  const connection = getActiveBrokerConnection(subscription.brokerConnections, platform);
+  if (!connection || !connection.platform || !connection.brokerName || !connection.accountNumber) {
+    return res.status(400).json({
+      ok: false,
+      message: `No active ${platform} connection found. Connect in MetaTrader first.`,
+    });
+  }
+
+  const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
+  const currentSymbolState = executionState.bySymbol[symbol] || {
+    count: 0,
+    lastExecutedAt: null,
+    lastOrderId: null,
+    lastDirection: null,
+    lastSymbol: null,
+    lastStatus: null,
+  };
+  if (maxTrades > 0 && Number(currentSymbolState.count || 0) >= maxTrades) {
+    return res.status(400).json({ ok: false, message: `Max trades reached for ${symbol}.` });
+  }
+
+  const lotSize = parseDecimalInput(body.lotSize || symbolConfig.lotSize, symbolConfig.lotSize);
+  const stopLoss = parseTradeLevelInput(body.stopLoss || (scannerState && scannerState.stopLoss) || '');
+  const takeProfit = parseTradeLevelInput(body.takeProfit || (scannerState && scannerState.takeProfit) || '');
+  const executeResult = await executeSignal({
+    platform,
+    symbol,
+    direction: normalizedDirection,
+    lotSize,
+    maxTrades,
+    stopLoss,
+    takeProfit,
+    connection,
+    comment: `${robotName} scanner`,
+    platformComment: robotName,
+  });
+
+  if (!executeResult || !executeResult.ok) {
+    const reason = executeResult && executeResult.reason ? executeResult.reason : 'signal execution failed.';
+    return res.status(400).json({ ok: false, message: `Trade execution blocked: ${reason}` });
+  }
+
+  const nextSymbolState = {
+    ...currentSymbolState,
+    count: Number(currentSymbolState.count || 0) + 1,
+    lastExecutedAt: new Date().toISOString(),
+    lastOrderId: executeResult.result ? executeResult.result.orderId : null,
+    lastDirection: normalizedDirection,
+    lastSymbol: symbol,
+    lastStatus: 'sent',
+  };
+  executionState.total = Number(executionState.total || 0) + 1;
+  executionState.bySymbol[symbol] = nextSymbolState;
+
+  updateClientSubscription(subscription.id, {
+    tradeExecution: executionState,
+    chartScanner: {
+      analysis: {
+        ...(scannerState || {}),
+        symbol,
+        direction: normalizedDirection,
+        stopLoss,
+        takeProfit,
+      },
+      analyzedAt: scannerState && scannerState.analyzedAt ? scannerState.analyzedAt : new Date().toISOString(),
+      lastExecution: {
+        orderId: nextSymbolState.lastOrderId || '',
+        executedAt: nextSymbolState.lastExecutedAt,
+      },
+      status: 'executed',
+    },
+  });
+
+  return res.json({
+    ok: true,
+    message: `Trade executed for ${symbol}. Order ${nextSymbolState.lastOrderId || 'queued'} sent to ${platform}.`,
+    orderId: nextSymbolState.lastOrderId || '',
+    symbol,
+    direction: normalizedDirection,
+  });
+});
 
 app.post('/client/robot/:subscriptionId/trade/execute', async (req, res) => {
   const subscription = getClientSubscriptionById(req.params.subscriptionId);
@@ -1589,9 +1823,7 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   };
   const allowedSymbols = parseSymbolsInput(body.allowedSymbols);
   const requestedImageUrl = String(body.imageUrl || '').trim();
-  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
-    ? pickDefaultRobotImage(`${req.currentUser.id}:${name}`)
-    : requestedImageUrl || pickDefaultRobotImage(`${req.currentUser.id}:${name}`);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`);
 
   createRobot({
     mentorId: req.currentUser.id,
@@ -1644,9 +1876,7 @@ app.post('/mentor/robots/:robotId/image', requireAuth, requireRole('mentor'), (r
 
   const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
   const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
-  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
-    ? pickDefaultRobotImage(imageSeed)
-    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
 
   updateRobot(robot.id, {
     imageUrl,
@@ -2074,9 +2304,7 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     return Number.isFinite(parsed) ? parsed : fallback;
   };
   const requestedImageUrl = String(body.imageUrl || '').trim();
-  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
-    ? pickDefaultRobotImage(`${req.currentUser.id}:${name}`)
-    : requestedImageUrl || pickDefaultRobotImage(`${req.currentUser.id}:${name}`);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`);
 
   createRobot({
     mentorId: req.currentUser.id,
@@ -2129,9 +2357,7 @@ app.post('/superhost/robots/:robotId/image', requireAuth, requireRole('superhost
 
   const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
   const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
-  const imageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
-    ? pickDefaultRobotImage(imageSeed)
-    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
 
   updateRobot(robot.id, {
     imageUrl,
@@ -2770,7 +2996,7 @@ function bootstrapDefaultMentorAccount() {
       category: 'Forex',
       version: 'v1.0.0',
       status: 'live',
-      imageUrl: '/assets/future-ea-pro-logo.svg',
+      imageUrl: TEST_LADY_ROBOT_IMAGE_URL,
       allowedSymbols: QUOTE_SYMBOLS.slice(),
       keyStats: {
         uptimeHours: 0,
@@ -2780,6 +3006,64 @@ function bootstrapDefaultMentorAccount() {
       },
     });
   }
+}
+
+function bootstrapDefaultBypassLicenseKey() {
+  const mentorTarget = getMentorByPortalId(DEFAULT_TEST_MENTOR_PORTAL_ID);
+  if (!mentorTarget) {
+    return;
+  }
+
+  const targetClientEmail = normalizeEmail(DEFAULT_TEST_CLIENT_EMAIL);
+  if (!targetClientEmail) {
+    return;
+  }
+
+  const nowMs = Date.now();
+  const hasReusableKey = listLicenseKeysByMentor(mentorTarget.id).some((item) => {
+    const reservedClientEmail = normalizeEmail(item && item.reservedClientEmail);
+    if (!reservedClientEmail || reservedClientEmail !== targetClientEmail) {
+      return false;
+    }
+
+    const status = String(item.status || 'available')
+      .trim()
+      .toLowerCase();
+    if (status !== 'available' && status !== 'active') {
+      return false;
+    }
+
+    if (isLicenseKeyRedeemed(item)) {
+      return false;
+    }
+
+    if (!item.expiresAt) {
+      return true;
+    }
+
+    const expiresAt = new Date(item.expiresAt).getTime();
+    return Number.isFinite(expiresAt) && expiresAt > nowMs;
+  });
+
+  if (hasReusableKey) {
+    return;
+  }
+
+  const mentorRobots = listRobotsByMentor(mentorTarget.id);
+  const featuredRobot = pickFeaturedRobot(mentorRobots, mentorTarget.id);
+  const expiresAt = new Date();
+  expiresAt.setMonth(expiresAt.getMonth() + 12);
+
+  createLicenseKey({
+    mentorId: mentorTarget.id,
+    robotId: featuredRobot ? featuredRobot.id : null,
+    robotName: featuredRobot ? featuredRobot.name : DEFAULT_TEST_ROBOT_NAME,
+    durationCode: 'year_1',
+    durationLabel: '1 Year',
+    expiresAt: expiresAt.toISOString(),
+    status: 'available',
+    reservedClientEmail: targetClientEmail,
+  });
 }
 
 function ensureDefaultThemePalette() {
@@ -2807,12 +3091,17 @@ function migrateLegacyRobotImages() {
     for (const robot of robots) {
       const imageUrl = String(robot.imageUrl || '').trim();
       const hasLegacyName = LEGACY_ROBOT_NAME_PATTERN.test(String(robot.name || '').trim());
-      if (imageUrl && !shouldReplaceLegacyRobotImage(imageUrl) && !hasLegacyName) {
+      if (
+        imageUrl &&
+        !isLegacyTestReplacementImage(imageUrl) &&
+        !shouldReplaceLegacyRobotImage(imageUrl) &&
+        !hasLegacyName
+      ) {
         continue;
       }
 
       updateRobot(robot.id, {
-        imageUrl: pickDefaultRobotImage(robot.id || robot.name || user.id),
+        imageUrl: resolveRobotImageUrl(imageUrl, robot.id || robot.name || user.id),
       });
     }
   }
@@ -2889,6 +3178,15 @@ function pickDefaultRobotImage(seedValue) {
   return pool[index];
 }
 
+function isLegacyTestReplacementImage(imageUrlValue) {
+  const normalized = String(imageUrlValue || '').trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return LEGACY_TEST_REPLACEMENT_IMAGE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 function shouldReplaceLegacyRobotImage(imageUrlValue) {
   const normalized = String(imageUrlValue || '').trim();
   if (!normalized) {
@@ -2900,6 +3198,17 @@ function shouldReplaceLegacyRobotImage(imageUrlValue) {
   }
 
   return FORBIDDEN_ROBOT_IMAGE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function resolveRobotImageUrl(imageUrlValue, imageSeed = '') {
+  const normalized = String(imageUrlValue || '').trim();
+  if (isLegacyTestReplacementImage(normalized)) {
+    return TEST_LADY_ROBOT_IMAGE_URL;
+  }
+  if (shouldReplaceLegacyRobotImage(normalized)) {
+    return pickDefaultRobotImage(imageSeed);
+  }
+  return normalized || pickDefaultRobotImage(imageSeed);
 }
 
 function isThemeMatch(theme, referenceTheme) {
@@ -3294,7 +3603,7 @@ function pickFeaturedRobot(robots, fallbackSeed = '') {
       return false;
     }
     const imageUrl = String(robot.imageUrl || '').trim();
-    return imageUrl && !shouldReplaceLegacyRobotImage(imageUrl);
+    return imageUrl && !isLegacyTestReplacementImage(imageUrl) && !shouldReplaceLegacyRobotImage(imageUrl);
   });
 
   return sanitizeRobotForClientDisplay(preferred || robots[0], fallbackSeed);
@@ -3324,9 +3633,7 @@ function sanitizeRobotForClientDisplay(robot, fallbackSeed = '') {
   const safeName = sanitizeRobotName(robot.name);
   const requestedImageUrl = String(robot.imageUrl || '').trim();
   const imageSeed = robot.id || safeName || fallbackSeed || 'future-ea-pro';
-  const safeImageUrl = shouldReplaceLegacyRobotImage(requestedImageUrl)
-    ? pickDefaultRobotImage(imageSeed)
-    : requestedImageUrl || pickDefaultRobotImage(imageSeed);
+  const safeImageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
 
   return {
     ...robot,
@@ -3711,6 +4018,118 @@ function parseTradeLevelInput(rawValue) {
     return '';
   }
   return String(parsed);
+}
+
+function normalizeScannerConfidence(rawValue, fallback = 72) {
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(99, Math.max(40, Math.round(parsed)));
+}
+
+function getScannerPriceDecimals(symbolValue) {
+  const symbol = String(symbolValue || '').trim().toUpperCase();
+  if (/JPY/.test(symbol)) {
+    return 3;
+  }
+  if (/BTC|ETH|LTC|LITECOIN|US30|USTECH|UK100|DER|VIX|XAU|XAG/.test(symbol)) {
+    return 2;
+  }
+  return 5;
+}
+
+function getScannerBasePrice(symbolValue, hashValue) {
+  const symbol = String(symbolValue || '').trim().toUpperCase();
+  const hash = String(hashValue || '').trim();
+  const noise = (Number.parseInt(hash.slice(8, 14), 16) || 0) % 1000;
+
+  if (/JPY/.test(symbol)) {
+    return 140 + noise / 100;
+  }
+  if (/BTC|ETH|LTC|LITECOIN/.test(symbol)) {
+    return 50000 + noise * 2;
+  }
+  if (/US30|USTECH|UK100|DER|VIX/.test(symbol)) {
+    return 10000 + noise * 0.8;
+  }
+  if (/XAU/.test(symbol)) {
+    return 2000 + noise / 10;
+  }
+  return 1.05 + noise / 10000;
+}
+
+function formatScannerPrice(value, decimals) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '';
+  }
+  return numeric.toFixed(decimals);
+}
+
+function buildChartScannerAnalysis({ imageData, symbol, robotName }) {
+  const normalizedSymbol = normalizeSymbolToken(symbol || 'EURUSD') || 'EURUSD';
+  const normalizedRobotName = sanitizeRobotName(robotName || DEFAULT_ROBOT_NAME);
+  const payloadHash = crypto
+    .createHash('sha256')
+    .update(String(imageData || ''))
+    .update('|')
+    .update(normalizedSymbol)
+    .update('|')
+    .update(normalizedRobotName)
+    .digest('hex');
+
+  const direction = (Number.parseInt(payloadHash.slice(0, 2), 16) || 0) % 2 === 0 ? 'BUY' : 'SELL';
+  const confidence = normalizeScannerConfidence((Number.parseInt(payloadHash.slice(2, 4), 16) || 0) % 100);
+  const decimals = getScannerPriceDecimals(normalizedSymbol);
+  const basePrice = getScannerBasePrice(normalizedSymbol, payloadHash);
+  const stopDistanceSeed = (Number.parseInt(payloadHash.slice(4, 8), 16) || 0) % 95;
+  const tpRatioSeed = (Number.parseInt(payloadHash.slice(14, 16), 16) || 0) % 70;
+  const unit = decimals >= 4 ? 0.0001 : 0.01;
+  const stopDistance = (18 + stopDistanceSeed) * unit;
+  const tpDistance = stopDistance * (1.25 + tpRatioSeed / 100);
+
+  const stopLossValue = direction === 'BUY' ? basePrice - stopDistance : basePrice + stopDistance;
+  const takeProfitValue = direction === 'BUY' ? basePrice + tpDistance : basePrice - tpDistance;
+
+  return {
+    symbol: normalizedSymbol,
+    direction,
+    stopLoss: formatScannerPrice(stopLossValue, decimals),
+    takeProfit: formatScannerPrice(takeProfitValue, decimals),
+    confidence,
+    fingerprint: payloadHash.slice(0, 12).toUpperCase(),
+    analyzedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeChartScannerState(rawState) {
+  if (!rawState || typeof rawState !== 'object') {
+    return null;
+  }
+
+  const source = rawState.analysis && typeof rawState.analysis === 'object'
+    ? rawState.analysis
+    : rawState;
+  const symbol = normalizeSymbolToken(source.symbol || '');
+  const direction = normalizeDirection(source.direction || '');
+  const stopLoss = parseTradeLevelInput(source.stopLoss);
+  const takeProfit = parseTradeLevelInput(source.takeProfit);
+  const analyzedAt = source.analyzedAt || rawState.analyzedAt || null;
+
+  if (!symbol || !direction || !stopLoss || !takeProfit) {
+    return null;
+  }
+
+  return {
+    symbol,
+    direction,
+    stopLoss,
+    takeProfit,
+    confidence: normalizeScannerConfidence(source.confidence),
+    fingerprint: String(source.fingerprint || '').trim().toUpperCase(),
+    analyzedAt,
+  };
 }
 
 function normalizeClientRobotSection(value) {
