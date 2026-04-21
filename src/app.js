@@ -3183,7 +3183,10 @@ function isClientSubscriptionBypassed(clientEmail) {
 }
 
 function normalizeLicenseInput(rawValue) {
-  return normalizeLicenseKey(rawValue);
+  return String(rawValue || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 function normalizeDeviceId(rawValue) {
