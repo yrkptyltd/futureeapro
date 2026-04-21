@@ -29,7 +29,7 @@
 
   const root = document.documentElement;
   const appRoot = document.querySelector('.client-app-root');
-  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/future-ea-pro-logo.svg');
+  const defaultRobotBg = String(appRoot?.dataset.defaultRobotBg || '/assets/future-ea-pro-logo.png');
   const defaultMediaId = String(appRoot?.dataset.defaultMediaId || '').trim();
   const faceSelectors = Array.from(document.querySelectorAll('[data-face-style-select]'));
   const faceStyleButtons = Array.from(document.querySelectorAll('[data-face-style-choice]'));

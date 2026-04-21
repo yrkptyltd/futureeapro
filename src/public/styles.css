@@ -24,7 +24,7 @@
   --client-bg-b: #1a070d;
   --client-panel: rgba(17, 11, 16, 0.9);
   --client-border: rgba(239, 47, 55, 0.55);
-  --client-screen-bg-image: url('/assets/future-ea-pro-logo.svg');
+  --client-screen-bg-image: url('/assets/future-ea-pro-logo.png');
   --client-bottom-shade-soft: rgba(239, 47, 55, 0.3);
   --client-bottom-shade: rgba(239, 47, 55, 0.7);
 }

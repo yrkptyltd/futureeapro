@@ -1,0 +1,43 @@
+<%- include('partials/top', { title: title }) %>
+
+<section class="dashboard-overview">
+  <article class="panel welcome-banner">
+    <div class="welcome-icon" aria-hidden="true">🤖</div>
+    <div>
+      <h2>Install Future EA Pro on Android</h2>
+      <p class="welcome-sub">
+        Use the latest Future EA Pro client directly from the live web app. This always stays on newest updates.
+      </p>
+    </div>
+  </article>
+</section>
+
+<section class="panel-grid home-split">
+  <article class="panel quick-card">
+    <h2>Recommended Install</h2>
+    <ol class="list">
+      <li>Tap <strong>Open Client App</strong> below.</li>
+      <li>In Chrome, open browser menu (<strong>⋮</strong>).</li>
+      <li>Select <strong>Add to Home screen</strong> (or <strong>Install app</strong>).</li>
+      <li>Launch Future EA Pro from your Android home screen.</li>
+    </ol>
+    <div class="cta-row">
+      <a class="button" href="/client">Open Client App</a>
+      <a class="button secondary" href="/">Back Home</a>
+    </div>
+  </article>
+
+  <% if (legacyApkAvailable) { %>
+  <article class="panel quick-card">
+    <h2>Legacy APK (Older Build)</h2>
+    <p class="hint">
+      This APK may show older branding. Use only if you explicitly need the legacy package.
+    </p>
+    <div class="cta-row">
+      <a class="button secondary" href="/download/android?legacy=1">Download Legacy APK</a>
+    </div>
+  </article>
+  <% } %>
+</section>
+
+<%- include('partials/bottom') %>

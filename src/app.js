@@ -167,7 +167,7 @@ const TRADE_EXECUTION_FIELD_LABELS = {
   lastSymbol: 'lastSymbol',
   lastStatus: 'lastStatus',
 };
-const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.svg'];
+const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.png'];
 const TEST_LADY_ROBOT_IMAGE_URL = '/assets/robots/futureeapro-test-lady-cyber.jpg';
 const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
@@ -195,7 +195,7 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
     label: 'Blue Mortal Motion',
     type: 'video',
     src: '/assets/background-videos/blue-mortal-motion.mp4',
-    poster: '/assets/future-ea-pro-logo.svg',
+    poster: '/assets/future-ea-pro-logo.png',
     themeHint: 'blue',
   },
   {
@@ -203,7 +203,7 @@ const CLIENT_BACKGROUND_MEDIA_LIBRARY = [
     label: 'Blue Mortal Motion Alt',
     type: 'video',
     src: '/assets/background-videos/blue-mortal-motion-alt.mp4',
-    poster: '/assets/future-ea-pro-logo.svg',
+    poster: '/assets/future-ea-pro-logo.png',
     themeHint: 'blue',
   },
   {
@@ -400,10 +400,6 @@ app.use((error, req, _res, next) => {
     return next(error);
   }
 
-  if (!String(req.path || '').startsWith('/api/')) {
-    return next(error);
-  }
-
   const rawBody = typeof error.body === 'string' ? error.body.trim() : '';
   const fallbackBody = {};
 
@@ -573,11 +569,18 @@ app.get('/client', (_req, res) => {
   });
 });
 
-app.get('/download/android', (_req, res) => {
-  if (!fs.existsSync(ANDROID_TEST_APK_PATH)) {
-    return res.redirect('/client');
+app.get('/download/android', (req, res) => {
+  const legacyRequested = String((req.query && req.query.legacy) || '').trim() === '1';
+  const legacyApkAvailable = fs.existsSync(ANDROID_TEST_APK_PATH);
+
+  if (legacyRequested && legacyApkAvailable) {
+    return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
   }
-  return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
+
+  return res.render('download-android', {
+    title: 'Install Android App',
+    legacyApkAvailable,
+  });
 });
 
 app.get('/download/ios', (_req, res) => {
@@ -644,7 +647,7 @@ function handleApiMentorLookup(req, res) {
       ? {
           id: featuredRobot.id,
           name: sanitizeRobotName(featuredRobot.name),
-          imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.svg',
+          imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.png',
           priceZar: Number(mentor.robotPricePerKey || 0),
         }
       : null,
@@ -722,7 +725,7 @@ app.post('/api/licenses/validate', (req, res) => {
         ? {
             id: featuredRobot.id,
             name: sanitizeRobotName(featuredRobot.name),
-            imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.svg',
+            imageUrl: featuredRobot.imageUrl || '/assets/future-ea-pro-logo.png',
           }
         : null,
     });
@@ -1030,7 +1033,7 @@ app.get('/client/subscription', (req, res) => {
     plans: CLIENT_PLAN_LIST,
     featuredRobot,
     funnelBackgroundImage:
-      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.svg',
+      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.png',
   });
 });
 
@@ -1094,7 +1097,7 @@ app.get('/client/unlock', (req, res) => {
     plan,
     featuredRobot,
     funnelBackgroundImage:
-      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.svg',
+      (featuredRobot && featuredRobot.imageUrl) || '/assets/future-ea-pro-logo.png',
     deviceId: getRequestDeviceId(req, req.session.clientDeviceId || ''),
   });
 });
@@ -3257,7 +3260,7 @@ function sanitizeRobotName(inputName) {
 function pickDefaultRobotImage(seedValue) {
   const pool = DEFAULT_ROBOT_IMAGE_URLS;
   if (!pool.length) {
-    return '/assets/future-ea-pro-logo.svg';
+    return '/assets/future-ea-pro-logo.png';
   }
 
   const seedText = String(seedValue || '');
