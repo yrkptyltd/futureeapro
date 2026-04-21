@@ -395,6 +395,37 @@ app.set('views', path.join(__dirname, 'views'));
 
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: false }));
+app.use((error, req, _res, next) => {
+  if (!error || error.type !== 'entity.parse.failed') {
+    return next(error);
+  }
+
+  if (!String(req.path || '').startsWith('/api/')) {
+    return next(error);
+  }
+
+  const rawBody = typeof error.body === 'string' ? error.body.trim() : '';
+  const fallbackBody = {};
+
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        Object.assign(fallbackBody, parsed);
+      }
+    } catch (_jsonError) {
+      const params = new URLSearchParams(rawBody);
+      for (const [key, value] of params.entries()) {
+        if (!(key in fallbackBody)) {
+          fallbackBody[key] = value;
+        }
+      }
+    }
+  }
+
+  req.body = fallbackBody;
+  return next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/previews', express.static(path.join(__dirname, '..', 'previews')));
 app.use(
