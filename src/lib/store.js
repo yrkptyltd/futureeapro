@@ -18,6 +18,9 @@ const DEFAULT_THEME = {
   bgEnd: '#1a1117',
   glow: '#ffe7eb',
 };
+const LICENSE_KEY_LENGTH = 8;
+const LICENSE_KEY_DISPLAY_SEGMENT_LENGTH = 4;
+const LICENSE_KEY_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const EMPTY_DATA = {
   users: [],
@@ -93,6 +96,58 @@ function getStorageStatus() {
 
 function createId(prefix) {
   return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function normalizeLicenseKey(rawValue) {
+  return String(rawValue || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+function formatLicenseKeyForDisplay(rawValue) {
+  const normalized = normalizeLicenseKey(rawValue);
+  if (normalized.length !== LICENSE_KEY_LENGTH) {
+    return normalized;
+  }
+  return `${normalized.slice(0, LICENSE_KEY_DISPLAY_SEGMENT_LENGTH)}-${normalized.slice(
+    LICENSE_KEY_DISPLAY_SEGMENT_LENGTH
+  )}`;
+}
+
+function generateRandomLicenseKey() {
+  const bytes = crypto.randomBytes(LICENSE_KEY_LENGTH);
+  let value = '';
+  for (let i = 0; i < LICENSE_KEY_LENGTH; i += 1) {
+    value += LICENSE_KEY_CHARSET[bytes[i] % LICENSE_KEY_CHARSET.length];
+  }
+  return value;
+}
+
+function createSecureLicenseKey(data) {
+  const keys = Array.isArray(data && data.licenseKeys) ? data.licenseKeys : readData().licenseKeys;
+  let key = '';
+  let attempts = 0;
+
+  while (attempts < 48) {
+    key = generateRandomLicenseKey();
+    if (!keys.some((item) => normalizeLicenseKey(item.key) === key)) {
+      return key;
+    }
+    attempts += 1;
+  }
+
+  // Extremely defensive fallback loop for pathological collisions.
+  while (true) {
+    key = generateRandomLicenseKey();
+    if (!keys.some((item) => normalizeLicenseKey(item.key) === key)) {
+      return key;
+    }
+  }
+}
+
+function listLicenseKeys() {
+  return readData().licenseKeys;
 }
 
 function getUserById(id) {
@@ -231,13 +286,13 @@ function createLicenseKey(input) {
     return null;
   }
 
-  const licenseNumber = getNextLicenseNumberFromData(data);
+  const generatedKey = createSecureLicenseKey(data);
   const key = {
     id: createId('key'),
     mentorId: input.mentorId,
     mentorPortalId: mentor.mentorPortalId,
-    key: String(licenseNumber),
-    licenseNumber,
+    key: generatedKey,
+    licenseNumber: null,
     robotId: input.robotId || null,
     robotName: input.robotName || '',
     durationCode: input.durationCode || '',
@@ -249,6 +304,9 @@ function createLicenseKey(input) {
     redeemedByClientEmail: null,
     redeemedAt: null,
     subscriptionId: null,
+    deviceId: null,
+    activatedAt: null,
+    usageCount: 0,
     createdAt: new Date().toISOString(),
   };
 
@@ -262,14 +320,23 @@ function listLicenseKeysByMentor(mentorId) {
 }
 
 function getLicenseKeyByMentorAndKey(mentorId, keyValue) {
-  const normalized = String(keyValue || '').trim();
+  const normalized = normalizeLicenseKey(keyValue);
   if (!normalized) {
     return null;
   }
 
   return readData().licenseKeys.find(
-    (item) => item.mentorId === mentorId && String(item.key) === normalized
+    (item) =>
+      item.mentorId === mentorId && normalizeLicenseKey(item.key) === normalized
   );
+}
+
+function getLicenseKeyById(licenseKeyId) {
+  const target = String(licenseKeyId || '').trim();
+  if (!target) {
+    return null;
+  }
+  return readData().licenseKeys.find((item) => item.id === target);
 }
 
 function updateLicenseKey(licenseKeyId, updates) {
@@ -308,6 +375,9 @@ function createClientSubscription(input) {
     startedAt: input.startedAt,
     endsAt: input.endsAt,
     status: input.status || 'active',
+    brokerConnections: Array.isArray(input.brokerConnections) ? input.brokerConnections : [],
+    symbolConfigs: input.symbolConfigs && typeof input.symbolConfigs === 'object' ? input.symbolConfigs : {},
+    tradeExecution: input.tradeExecution && typeof input.tradeExecution === 'object' ? input.tradeExecution : {},
     createdAt: new Date().toISOString(),
   };
 
@@ -416,23 +486,9 @@ function getCurrentMaxMentorPortalId(data) {
   return max;
 }
 
-function getNextLicenseNumberFromData(data) {
-  let max = 99;
-
-  for (const item of data.licenseKeys) {
-    const licenseNumber = Number.isInteger(item.licenseNumber)
-      ? item.licenseNumber
-      : Number.parseInt(item.key, 10);
-
-    if (Number.isInteger(licenseNumber) && licenseNumber > max) {
-      max = licenseNumber;
-    }
-  }
-
-  return max + 1;
-}
-
 module.exports = {
+  normalizeLicenseKey,
+  formatLicenseKeyForDisplay,
   ensureDataFile,
   ensureMentorPortalIds,
   getPortalTheme,
@@ -452,6 +508,8 @@ module.exports = {
   createLicenseKey,
   listLicenseKeysByMentor,
   getLicenseKeyByMentorAndKey,
+  getLicenseKeyById,
+  listLicenseKeys,
   updateLicenseKey,
   createClientSubscription,
   getClientSubscriptionById,
