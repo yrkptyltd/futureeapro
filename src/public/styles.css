@@ -414,6 +414,11 @@ body::before {
   margin-inline: auto;
 }
 
+.client-flow-screen.center-landing {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 7.2rem);
+  align-content: center;
+}
+
 .client-flow-card {
   background: linear-gradient(166deg, rgba(16, 18, 31, 0.95) 0%, rgba(10, 13, 24, 0.92) 100%);
   border: 1px solid color-mix(in srgb, var(--theme-primary) 44%, transparent);
@@ -3861,6 +3866,10 @@ code {
   .container.container-client-funnel {
     width: min(1120px, 95vw);
     margin-top: calc(env(safe-area-inset-top, 0px) + 0.55rem);
+  }
+
+  .client-flow-screen.center-landing {
+    min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 6.1rem);
   }
 
   .client-flow-card {
