@@ -671,15 +671,19 @@ app.get(['/download/android.apk', '/download/future-ea-pro.apk'], (_req, res) =>
   return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
 });
 
-app.get('/app/android', (_req, res) => {
+app.get(['/app', '/app/'], (_req, res) => {
+  return res.redirect('/client');
+});
+
+app.get(['/app/android', '/app/android/'], (_req, res) => {
   return res.redirect('/download/android?download=1');
 });
 
-app.get('/app/ios', (_req, res) => {
+app.get(['/app/ios', '/app/ios/'], (_req, res) => {
   return res.redirect('/download/ios');
 });
 
-app.get('/app/client', (_req, res) => {
+app.get(['/app/client', '/app/client/'], (_req, res) => {
   return res.redirect('/client');
 });
 
