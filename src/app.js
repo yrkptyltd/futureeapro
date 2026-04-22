@@ -570,10 +570,16 @@ app.get('/client', (_req, res) => {
 });
 
 app.get('/download/android', (req, res) => {
-  const legacyRequested = String((req.query && req.query.legacy) || '').trim() === '1';
+  const query = req.query && typeof req.query === 'object' ? req.query : {};
+  const legacyRequested = String(query.legacy || '').trim() === '1';
+  const directDownloadRequested = ['1', 'true', 'yes'].includes(
+    String(query.download || query.apk || query.direct || '')
+      .trim()
+      .toLowerCase()
+  );
   const legacyApkAvailable = fs.existsSync(ANDROID_TEST_APK_PATH);
 
-  if (legacyRequested && legacyApkAvailable) {
+  if ((legacyRequested || directDownloadRequested) && legacyApkAvailable) {
     return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
   }
 
@@ -589,6 +595,29 @@ app.get('/download/ios', (_req, res) => {
   });
 });
 
+app.get(['/download/android.apk', '/download/future-ea-pro.apk'], (_req, res) => {
+  const legacyApkAvailable = fs.existsSync(ANDROID_TEST_APK_PATH);
+  if (!legacyApkAvailable) {
+    return res.redirect('/download/android');
+  }
+  return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
+});
+
+app.get(['/app', '/app/'], (_req, res) => {
+  return res.redirect('/client');
+});
+
+app.get(['/app/android', '/app/android/'], (_req, res) => {
+  return res.redirect('/download/android?download=1');
+});
+
+app.get(['/app/ios', '/app/ios/'], (_req, res) => {
+  return res.redirect('/download/ios');
+});
+
+app.get(['/app/client', '/app/client/'], (_req, res) => {
+  return res.redirect('/client');
+});
 function handleApiMentorLookup(req, res) {
   const payload = readApiPayload(req);
   const mentorPortalId = parseMentorPortalIdInput(
