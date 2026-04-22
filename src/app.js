@@ -34,6 +34,14 @@ const {
   updateClientSubscription,
   listClientSubscriptionsByMentor,
   getMentorDetails,
+  createSignalRecord,
+  listSignalRecordsByMentor,
+  findRecentSignalByFingerprint,
+  updateSignalRecord,
+  createSignalJobsBulk,
+  listSignalJobsByMentor,
+  listSignalJobsBySubscription,
+  createAuditLog,
 } = require('./lib/store');
 const {
   createPasswordHash,
@@ -47,6 +55,19 @@ const {
   getActiveBrokerConnection,
   sanitizeConnection,
 } = require('./lib/metatrader-executor');
+const {
+  SIGNAL_ACTIONS,
+  normalizeSignalAction,
+  requiresSymbolForAction,
+  normalizeBridgeSymbol,
+  buildSignalFingerprint,
+  registerBridgeAgentSession,
+  recordBridgeHeartbeat,
+  dispatchSignalJobQueue,
+  getDispatchableJobsForBridge,
+  submitBridgeJobResult,
+  cleanupStaleBridgeSessions,
+} = require('./lib/bridge-orchestrator');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -69,7 +90,7 @@ const DEFAULT_TEST_CLIENT_EMAIL = normalizeEmail(
 const DEFAULT_TEST_LICENSE_KEY = normalizeLicenseInput(
   process.env.DEFAULT_TEST_LICENSE_KEY || 'FUTR3EA1'
 );
-const DEFAULT_TEST_ROBOT_NAME = 'Future EA Pro Core';
+const DEFAULT_TEST_ROBOT_NAME = 'Future EA Test Bot';
 const parsedUsdExchangeRate = Number(process.env.USD_EXCHANGE_RATE || 18.5);
 const USD_EXCHANGE_RATE =
   Number.isFinite(parsedUsdExchangeRate) && parsedUsdExchangeRate > 0
@@ -106,7 +127,17 @@ const LICENSE_KEY_DURATIONS = {
   lifetime: { code: 'lifetime', label: 'Lifetime (∞)', mode: 'lifetime', value: 0 },
 };
 const LICENSE_KEY_DURATION_LIST = Object.values(LICENSE_KEY_DURATIONS);
-const CLIENT_ROBOT_SECTIONS = ['home', 'quotes', 'trade', 'scanner', 'metatrader', 'details', 'settings'];
+const CLIENT_ROBOT_SECTIONS = [
+  'home',
+  'add-robot',
+  'quotes',
+  'trade',
+  'activity',
+  'scanner',
+  'metatrader',
+  'details',
+  'settings',
+];
 const QUOTE_SYMBOLS = [
   '.DER30.',
   '.UK100.',
@@ -167,8 +198,10 @@ const TRADE_EXECUTION_FIELD_LABELS = {
   lastSymbol: 'lastSymbol',
   lastStatus: 'lastStatus',
 };
-const DEFAULT_ROBOT_IMAGE_URLS = ['/assets/future-ea-pro-logo.png'];
+const NEUTRAL_ROBOT_PLACEHOLDER_IMAGE_URL = '/assets/robot-preview-astra.svg';
+const DEFAULT_ROBOT_IMAGE_URLS = [NEUTRAL_ROBOT_PLACEHOLDER_IMAGE_URL];
 const TEST_LADY_ROBOT_IMAGE_URL = '/assets/robots/futureeapro-test-lady-cyber.jpg';
+const FUTURE_EA_TEST_BOT_NAME = 'Future EA Test Bot';
 const DEFAULT_ROBOT_NAME = 'Future EA Pro Core';
 const LEGACY_RED_ROBOT_IMAGE_URL = '/assets/robot-preview-user.jpg';
 const LEGACY_ROBOT_NAME_PATTERN = /algo\s*nova\s*ea\s*v?6/i;
@@ -376,6 +409,40 @@ const FOREX_KEY_EVENT_KEYWORDS = [
   'unemployment',
   'payrolls',
 ];
+const FOREX_FILTER_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'tomorrow', label: 'Tomorrow' },
+  { value: 'week', label: 'This Week' },
+];
+const FOREX_CURRENCY_OPTIONS = ['ALL', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
+const NEWS_PROTECTION_MODES = {
+  conservative: {
+    key: 'conservative',
+    label: 'Conservative',
+    pauseBeforeMinutes: 60,
+    pauseAfterMinutes: 60,
+    behavior: 'block',
+  },
+  moderate: {
+    key: 'moderate',
+    label: 'Moderate',
+    pauseBeforeMinutes: 30,
+    pauseAfterMinutes: 30,
+    behavior: 'delay',
+  },
+  aggressive: {
+    key: 'aggressive',
+    label: 'Aggressive',
+    pauseBeforeMinutes: 10,
+    pauseAfterMinutes: 10,
+    behavior: 'allow',
+  },
+};
+const DEFAULT_NEWS_PROTECTION_MODE = 'moderate';
+const BRIDGE_AGENT_SHARED_TOKEN = String(
+  process.env.BRIDGE_AGENT_TOKEN || process.env.BRIDGE_SHARED_TOKEN || 'futureeapro-bridge-token'
+).trim();
+const BRIDGE_MAX_RETRIES = Number(process.env.BRIDGE_MAX_RETRIES || 3);
 let forexEventsCache = {
   fetchedAtMs: 0,
   items: [],
@@ -389,6 +456,7 @@ bootstrapDefaultMentorAccount();
 bootstrapDefaultBypassLicenseKey();
 migrateLegacyRobotImages();
 migrateLegacyRobotNames();
+startBridgeOrchestratorLoops();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -570,10 +638,16 @@ app.get('/client', (_req, res) => {
 });
 
 app.get('/download/android', (req, res) => {
-  const legacyRequested = String((req.query && req.query.legacy) || '').trim() === '1';
+  const query = req.query && typeof req.query === 'object' ? req.query : {};
+  const legacyRequested = String(query.legacy || '').trim() === '1';
+  const directDownloadRequested = ['1', 'true', 'yes'].includes(
+    String(query.download || query.apk || query.direct || '')
+      .trim()
+      .toLowerCase()
+  );
   const legacyApkAvailable = fs.existsSync(ANDROID_TEST_APK_PATH);
 
-  if (legacyRequested && legacyApkAvailable) {
+  if ((legacyRequested || directDownloadRequested) && legacyApkAvailable) {
     return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
   }
 
@@ -587,6 +661,26 @@ app.get('/download/ios', (_req, res) => {
   return res.render('download-ios', {
     title: 'Install iOS App',
   });
+});
+
+app.get(['/download/android.apk', '/download/future-ea-pro.apk'], (_req, res) => {
+  const legacyApkAvailable = fs.existsSync(ANDROID_TEST_APK_PATH);
+  if (!legacyApkAvailable) {
+    return res.redirect('/download/android');
+  }
+  return res.download(ANDROID_TEST_APK_PATH, 'future-ea-pro-android-beta.apk');
+});
+
+app.get('/app/android', (_req, res) => {
+  return res.redirect('/download/android?download=1');
+});
+
+app.get('/app/ios', (_req, res) => {
+  return res.redirect('/download/ios');
+});
+
+app.get('/app/client', (_req, res) => {
+  return res.redirect('/client');
 });
 
 function handleApiMentorLookup(req, res) {
@@ -942,12 +1036,59 @@ app.post('/api/licenses/unlock-client', (req, res) => {
   });
 });
 
-app.get('/api/economic-events', async (_req, res) => {
-  const items = await getUpcomingForexEvents(new Date());
+app.get('/api/economic-events', async (req, res) => {
+  const payload = readApiPayload(req);
+  const filter = normalizeForexFilter(payload.filter || payload.range || 'today');
+  const currency = normalizeForexCurrencyFilter(payload.currency || payload.ccy || '');
+  const data = await getUpcomingForexEvents(new Date(), {
+    filter,
+    currency,
+    includeLowImpact: true,
+    limit: 120,
+  });
   return res.status(200).json({
     ok: true,
-    count: items.length,
-    events: items,
+    filter: data.filter,
+    currencyFilter: data.currencyFilter,
+    fromLabel: data.fromLabel,
+    toLabel: data.toLabel,
+    summary: data.summary,
+    banner: data.banner,
+    volatility: data.volatility,
+    count: data.items.length,
+    events: data.items,
+  });
+});
+
+app.get('/api/client/:subscriptionId/copy-trading-feedback', (req, res) => {
+  const subscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!subscription) {
+    return res.status(404).json({ ok: false, message: 'Subscription not found.' });
+  }
+
+  const mentor = getUserById(subscription.mentorId);
+  const feedback = listSignalJobsBySubscription(subscription.id)
+    .sort((a, b) => (Date.parse(b.updatedAt || b.createdAt || 0) || 0) - (Date.parse(a.updatedAt || a.createdAt || 0) || 0))
+    .slice(0, 20)
+    .map((job) => ({
+      id: job.id,
+      signalId: job.signalId,
+      action: job.action,
+      symbol: job.symbol || 'ALL',
+      platform: job.platform,
+      status: job.executionStatus,
+      orderId: job.resultOrderId || '',
+      errorCode: job.errorCode || '',
+      errorMessage: job.errorMessage || '',
+      updatedAt: job.updatedAt || job.createdAt,
+    }));
+
+  return res.status(200).json({
+    ok: true,
+    mentorId: subscription.mentorPortalId,
+    copyTradingEnabled: subscription.copyTradingEnabled !== false,
+    newsProtection: getMentorNewsProtectionSettings(mentor || {}),
+    feedback,
   });
 });
 
@@ -959,6 +1100,171 @@ app.post('/api/trade-event', async (req, res) => {
     direction: normalizeDirection(payload.direction || payload.side || ''),
     symbol: String(payload.symbol || payload.pair || '').trim().toUpperCase(),
     message: 'Trade event accepted for processing.',
+  });
+});
+
+app.post('/api/bridge/session/register', (req, res) => {
+  const payload = readApiPayload(req);
+  const authToken = String(payload.authToken || payload.token || '').trim();
+  if (!isValidBridgeAgentToken(authToken)) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized bridge token.' });
+  }
+
+  const agentId = String(payload.agentId || payload.bridgeAgentId || '').trim();
+  const platform = normalizePlatform(payload.platform || 'MT5');
+  const accountNumber = String(payload.accountNumber || '').trim();
+  const serverName = String(payload.serverName || '').trim();
+
+  if (!agentId || !accountNumber || !serverName) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_REGISTER_MISSING_FIELDS',
+      message: 'agentId, accountNumber and serverName are required.',
+    });
+  }
+
+  const session = registerBridgeAgentSession({
+    agentId,
+    mentorId: payload.mentorId || null,
+    userId: payload.userId || null,
+    platform,
+    brokerName: String(payload.brokerName || '').trim(),
+    accountNumber,
+    serverName,
+    heartbeatIntervalMs: Number(payload.heartbeatIntervalMs || 15000),
+    capabilities: Array.isArray(payload.capabilities) ? payload.capabilities : ['market_order'],
+    authHash: crypto.createHash('sha256').update(authToken).digest('hex'),
+    metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {},
+  });
+
+  return res.status(200).json({
+    ok: true,
+    session: {
+      id: session.id,
+      agentId: session.agentId,
+      platform: session.platform,
+      brokerName: session.brokerName,
+      accountNumber: session.accountNumber,
+      serverName: session.serverName,
+      heartbeatIntervalMs: session.heartbeatIntervalMs,
+      status: session.status,
+    },
+  });
+});
+
+app.post('/api/bridge/session/heartbeat', (req, res) => {
+  const payload = readApiPayload(req);
+  const authToken = String(payload.authToken || payload.token || '').trim();
+  if (!isValidBridgeAgentToken(authToken)) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized bridge token.' });
+  }
+
+  const sessionId = String(payload.sessionId || '').trim();
+  if (!sessionId) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_HEARTBEAT_MISSING_SESSION',
+      message: 'sessionId is required.',
+    });
+  }
+
+  const session = recordBridgeHeartbeat({
+    sessionId,
+    status: payload.status || 'connected',
+    latencyMs: payload.latencyMs,
+    terminalVersion: payload.terminalVersion || '',
+    bridgeVersion: payload.bridgeVersion || '',
+    detail: payload.detail || 'heartbeat',
+  });
+
+  if (!session) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_SESSION_NOT_FOUND',
+      message: 'Bridge session not found.',
+    });
+  }
+
+  cleanupStaleBridgeSessions(new Date());
+  return res.status(200).json({
+    ok: true,
+    status: session.status,
+    lastHeartbeatAt: session.lastHeartbeatAt,
+  });
+});
+
+app.post('/api/bridge/jobs/pull', async (req, res) => {
+  const payload = readApiPayload(req);
+  const authToken = String(payload.authToken || payload.token || '').trim();
+  if (!isValidBridgeAgentToken(authToken)) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized bridge token.' });
+  }
+
+  const sessionId = String(payload.sessionId || '').trim();
+  if (!sessionId) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_PULL_MISSING_SESSION',
+      message: 'sessionId is required.',
+    });
+  }
+
+  await dispatchSignalJobQueue({ limit: 80 });
+  const jobs = getDispatchableJobsForBridge({
+    sessionId,
+    limit: Number(payload.limit || 20),
+  });
+
+  return res.status(200).json({
+    ok: true,
+    count: jobs.length,
+    jobs,
+  });
+});
+
+app.post('/api/bridge/jobs/:jobId/result', (req, res) => {
+  const payload = readApiPayload(req);
+  const authToken = String(payload.authToken || payload.token || '').trim();
+  if (!isValidBridgeAgentToken(authToken)) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized bridge token.' });
+  }
+
+  const jobId = String(req.params.jobId || '').trim();
+  const sessionId = String(payload.sessionId || '').trim();
+  const ok = payload.ok === true || String(payload.ok || '').trim().toLowerCase() === 'true';
+  if (!jobId || !sessionId) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_RESULT_MISSING_IDENTIFIERS',
+      message: 'jobId and sessionId are required.',
+    });
+  }
+
+  const result = submitBridgeJobResult({
+    sessionId,
+    jobId,
+    ok,
+    orderId: payload.orderId || payload.ticket || '',
+    errorCode: payload.errorCode || '',
+    errorMessage: payload.errorMessage || '',
+    result: payload.result && typeof payload.result === 'object' ? payload.result : {},
+  });
+
+  if (!result.ok) {
+    return res.status(200).json({
+      ok: false,
+      code: 'BRIDGE_RESULT_REJECTED',
+      message: result.reason || 'Could not process bridge result.',
+    });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    job: {
+      id: result.job.id,
+      executionStatus: result.job.executionStatus,
+      resultOrderId: result.job.resultOrderId || '',
+    },
   });
 });
 
@@ -1235,7 +1541,7 @@ app.get('/client/success/:subscriptionId', (req, res) => {
   });
 });
 
-app.get('/client/robot/:subscriptionId', (req, res) => {
+app.get('/client/robot/:subscriptionId', async (req, res) => {
   const subscription = getClientSubscriptionById(req.params.subscriptionId);
   if (!subscription) {
     setFlash(req, 'error', 'Robot session not found.');
@@ -1295,6 +1601,29 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
   const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
   const chartScannerState = normalizeChartScannerState(subscription.chartScanner);
   const activeBrokerConnection = getActiveBrokerConnection(brokerConnections, 'MT5');
+  const copyTradingFeedback = listSignalJobsBySubscription(subscription.id)
+    .sort((a, b) => (Date.parse(b.updatedAt || b.createdAt || 0) || 0) - (Date.parse(a.updatedAt || a.createdAt || 0) || 0))
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.id,
+      action: item.action,
+      symbol: item.symbol || 'ALL',
+      status: item.executionStatus,
+      platform: item.platform,
+      orderId: item.resultOrderId || '',
+      errorCode: item.errorCode || '',
+      errorMessage: item.errorMessage || '',
+      updatedAt: item.updatedAt || item.createdAt,
+    }));
+  const mentorProtection = mentor ? getMentorNewsProtectionSettings(mentor) : getMentorNewsProtectionSettings({});
+  const mobileEvents = await getUpcomingForexEvents(new Date(), {
+    filter: 'today',
+    includeLowImpact: false,
+    limit: 10,
+  });
+  const mobileHighImpactEvents = (mobileEvents.items || [])
+    .filter((item) => normalizeForexImpact(item.impactLevel || item.impact) === 'high')
+    .slice(0, 5);
   const selectedSymbolLookup = Object.create(null);
   for (const symbol of Object.keys(symbolConfigs)) {
     selectedSymbolLookup[symbol] = true;
@@ -1327,9 +1656,120 @@ app.get('/client/robot/:subscriptionId', (req, res) => {
     defaultSymbolConfigs: DEFAULT_SYMBOL_CONFIG,
     executionState,
     chartScannerState,
+    copyTradingFeedback,
+    mentorProtection,
+    mobileHighImpactEvents,
+    mobileEventBanner: mobileEvents.banner,
+    mobileVolatility: mobileEvents.volatility,
     executionSymbolRows: buildExecutionSymbolRows(availableSymbolMap, symbolConfigs, executionState),
     tradeExecutionMessage: '',
   });
+});
+
+app.post('/client/robot/:subscriptionId/settings', (req, res) => {
+  const subscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!subscription) {
+    setFlash(req, 'error', 'Robot session not found.');
+    return res.redirect('/client');
+  }
+
+  const body = req.body || {};
+  const copyTradingEnabled = String(body.copyTradingEnabled || '').trim().toLowerCase();
+  const notificationsEnabled = String(body.notificationsEnabled || '').trim().toLowerCase();
+  const nextCopyTradingEnabled =
+    copyTradingEnabled === 'on' || copyTradingEnabled === 'true' || copyTradingEnabled === 'yes';
+  const nextNotificationsEnabled =
+    notificationsEnabled === 'on' || notificationsEnabled === 'true' || notificationsEnabled === 'yes';
+
+  updateClientSubscription(subscription.id, {
+    copyTradingEnabled: nextCopyTradingEnabled,
+    notificationsEnabled: nextNotificationsEnabled,
+    copyTradingStatus: nextCopyTradingEnabled ? 'ready' : 'disabled',
+  });
+
+  setFlash(req, 'success', 'App settings updated.');
+  return res.redirect(`/client/robot/${subscription.id}?section=settings`);
+});
+
+app.post('/client/robot/:subscriptionId/add-robot-license', (req, res) => {
+  const currentSubscription = getClientSubscriptionById(req.params.subscriptionId);
+  if (!currentSubscription) {
+    setFlash(req, 'error', 'Robot session not found.');
+    return res.redirect('/client');
+  }
+
+  const body = req.body || {};
+  const enteredLicenseKey = normalizeLicenseInput(body.licenseKey || body.key || '');
+  if (!enteredLicenseKey) {
+    setFlash(req, 'error', 'Enter a valid license key.');
+    return res.redirect(`/client/robot/${currentSubscription.id}?section=add-robot`);
+  }
+
+  const mentor = getUserById(currentSubscription.mentorId);
+  if (!mentor) {
+    setFlash(req, 'error', 'Mentor account not found.');
+    return res.redirect('/client');
+  }
+
+  const licenseRecord = getLicenseKeyByMentorAndKey(mentor.id, enteredLicenseKey);
+  if (!licenseRecord) {
+    setFlash(req, 'error', 'Invalid license key for this mentor.');
+    return res.redirect(`/client/robot/${currentSubscription.id}?section=add-robot`);
+  }
+
+  if (isLicenseKeyRedeemed(licenseRecord)) {
+    setFlash(req, 'error', 'This license key has already been used.');
+    return res.redirect(`/client/robot/${currentSubscription.id}?section=add-robot`);
+  }
+
+  const reservedEmail = normalizeEmail(licenseRecord.reservedClientEmail);
+  if (reservedEmail && reservedEmail !== normalizeEmail(currentSubscription.clientEmail)) {
+    setFlash(req, 'error', 'This key is reserved for another email.');
+    return res.redirect(`/client/robot/${currentSubscription.id}?section=add-robot`);
+  }
+
+  if (licenseRecord.expiresAt) {
+    const expiresAtMs = Date.parse(licenseRecord.expiresAt || 0) || 0;
+    if (expiresAtMs && expiresAtMs < Date.now()) {
+      setFlash(req, 'error', 'This license key has expired.');
+      return res.redirect(`/client/robot/${currentSubscription.id}?section=add-robot`);
+    }
+  }
+
+  const now = new Date();
+  const plan = getClientPlan(currentSubscription.planCode) || CLIENT_PLANS.month_1;
+  const newSubscription = createClientSubscription({
+    mentorId: currentSubscription.mentorId,
+    mentorPortalId: currentSubscription.mentorPortalId,
+    clientEmail: currentSubscription.clientEmail,
+    planCode: plan.code,
+    durationMonths: plan.durationMonths,
+    amountZar: 0,
+    robotId: licenseRecord.robotId || null,
+    robotName: licenseRecord.robotName || '',
+    licenseDurationCode: licenseRecord.durationCode || '',
+    licenseDurationLabel: licenseRecord.durationLabel || '',
+    licenseKeyExpiresAt: licenseRecord.expiresAt || null,
+    licenseKey: normalizeLicenseInput(licenseRecord.key),
+    licenseNumber: licenseRecord.licenseNumber,
+    startedAt: now.toISOString(),
+    endsAt: addMonths(now, plan.durationMonths).toISOString(),
+    status: 'active',
+    copyTradingEnabled: currentSubscription.copyTradingEnabled !== false,
+    notificationsEnabled: currentSubscription.notificationsEnabled !== false,
+  });
+
+  updateLicenseKey(licenseRecord.id, {
+    status: 'redeemed',
+    redeemedByClientEmail: normalizeEmail(currentSubscription.clientEmail),
+    redeemedAt: new Date().toISOString(),
+    activatedAt: new Date().toISOString(),
+    usageCount: Number(licenseRecord.usageCount || 0) + 1,
+    subscriptionId: newSubscription.id,
+  });
+
+  setFlash(req, 'success', 'New robot unlocked successfully.');
+  return res.redirect(`/client/robot/${newSubscription.id}?section=home`);
 });
 
 function handleClientSymbolConfigRequest(req, res) {
@@ -1771,6 +2211,7 @@ app.post('/client/robot/:subscriptionId/trade/execute', async (req, res) => {
 
 app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res) => {
   const now = new Date();
+  const query = req.query || {};
   const currentSection = normalizeMentorDashboardSection(req.query && req.query.section);
   const dashboard = buildOperatorDashboard(req.currentUser.id, now);
   if (!dashboard) {
@@ -1778,7 +2219,29 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res
     return res.redirect('/signin');
   }
 
-  const forexEvents = await getUpcomingForexEvents(now);
+  const forexFilter = normalizeForexFilter(query.forexFilter || query.eventsFilter || 'today');
+  const forexCurrency = normalizeForexCurrencyFilter(query.forexCurrency || query.currency || '');
+  const forexEvents = await getUpcomingForexEvents(now, {
+    filter: forexFilter,
+    currency: forexCurrency,
+    includeLowImpact: true,
+    limit: 120,
+  });
+  const copyTradingSignals = listSignalRecordsByMentor(req.currentUser.id)
+    .sort((a, b) => (Date.parse(b.createdAt || 0) || 0) - (Date.parse(a.createdAt || 0) || 0));
+  const copyTradingJobs = listSignalJobsByMentor(req.currentUser.id)
+    .sort((a, b) => (Date.parse(b.createdAt || 0) || 0) - (Date.parse(a.createdAt || 0) || 0));
+  const copyTradingSummary = {
+    totalSignals: copyTradingSignals.length,
+    queuedJobs: copyTradingJobs.filter((item) =>
+      ['queued', 'retry_wait', 'dispatched', 'processing'].includes(
+        String(item.executionStatus || '').trim().toLowerCase()
+      )
+    ).length,
+    executedJobs: copyTradingJobs.filter((item) => String(item.executionStatus || '').trim().toLowerCase() === 'executed').length,
+    failedJobs: copyTradingJobs.filter((item) => String(item.executionStatus || '').trim().toLowerCase() === 'failed').length,
+  };
+  const mentorProtection = getMentorNewsProtectionSettings(dashboard.account);
 
   res.render('mentor-dashboard', {
     title: 'Mentor Dashboard',
@@ -1792,6 +2255,15 @@ app.get('/mentor/dashboard', requireAuth, requireRole('mentor'), async (req, res
     licenseDurationOptions: LICENSE_KEY_DURATION_LIST,
     dashboardDateLabel: formatDashboardDate(now),
     forexEvents,
+    forexFilter,
+    forexCurrency,
+    forexFilterOptions: FOREX_FILTER_OPTIONS,
+    forexCurrencyOptions: FOREX_CURRENCY_OPTIONS,
+    mentorProtection,
+    signalActionOptions: SIGNAL_ACTIONS,
+    copyTradingSummary,
+    copyTradingSignals: copyTradingSignals.slice(0, 25),
+    copyTradingJobs: copyTradingJobs.slice(0, 60),
     currentSection,
     mobilePreviews: getMobilePreviewCatalog(),
   });
@@ -1864,13 +2336,17 @@ app.post('/mentor/robots', requireAuth, requireRole('mentor'), (req, res) => {
   };
   const allowedSymbols = parseSymbolsInput(body.allowedSymbols);
   const requestedImageUrl = String(body.imageUrl || '').trim();
-  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`, name);
 
   createRobot({
     mentorId: req.currentUser.id,
     name,
     description: String(body.description || '').trim(),
     category: String(body.category || '').trim(),
+    commentTag: String(body.commentTag || '').trim() || name,
+    tradingMode: String(body.tradingMode || '').trim() || 'automated',
+    riskProfile: String(body.riskProfile || '').trim() || 'balanced',
+    licenseRequired: true,
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
     imageUrl,
@@ -1917,7 +2393,7 @@ app.post('/mentor/robots/:robotId/image', requireAuth, requireRole('mentor'), (r
 
   const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
   const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
-  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed, robot.name);
 
   updateRobot(robot.id, {
     imageUrl,
@@ -2038,6 +2514,272 @@ app.post('/mentor/license-keys/:licenseKeyId/reactivate', requireAuth, requireRo
 
   setFlash(req, 'success', `License key ${formatLicenseKeyForDisplay(licenseKey.key)} has been reactivated.`);
   return res.redirect('/mentor/dashboard?section=generate-key#generate-key');
+});
+
+app.post('/mentor/copy-trading/settings', requireAuth, requireRole('mentor'), (req, res) => {
+  const body = req.body || {};
+  const mode = String(body.newsProtectionMode || '').trim().toLowerCase();
+  const config = getNewsProtectionModeConfig(mode);
+  const newsProtectionEnabled = String(body.newsProtectionEnabled || '').trim().toLowerCase();
+  const enabled = newsProtectionEnabled === 'on' || newsProtectionEnabled === 'true' || newsProtectionEnabled === 'yes';
+
+  updateUser(req.currentUser.id, {
+    newsProtectionMode: config.key,
+    newsProtectionEnabled: enabled,
+  });
+
+  setFlash(req, 'success', `Copy trading protection updated (${config.label}).`);
+  return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+});
+
+app.post('/mentor/copy-trading/signals', requireAuth, requireRole('mentor'), async (req, res) => {
+  const body = req.body || {};
+  const now = new Date();
+  const mentor = getUserById(req.currentUser.id);
+  if (!mentor || mentor.role !== 'mentor') {
+    setFlash(req, 'error', 'Mentor account not found.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  const action = normalizeSignalAction(body.action || body.signalType || '');
+  const robotId = String(body.robotId || '').trim();
+  const platform = normalizePlatform(body.platform || 'MT5');
+  const symbol = normalizeSymbolToken(body.symbol || '');
+  const direction = normalizeDirection(body.direction || action);
+  const stopLoss = parseTradeLevelInput(body.stopLoss || '');
+  const takeProfit = parseTradeLevelInput(body.takeProfit || '');
+  const lotSize = parseDecimalInput(body.lotSize || '', DEFAULT_SYMBOL_CONFIG.lotSize);
+
+  if (!action) {
+    setFlash(req, 'error', 'Choose a valid signal action.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  const robot = getRobotById(robotId);
+  if (!robot || robot.mentorId !== req.currentUser.id) {
+    setFlash(req, 'error', 'Choose one of your robots before sending a signal.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  if (requiresSymbolForAction(action) && !symbol) {
+    setFlash(req, 'error', 'A symbol is required for this signal action.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  const allowedSymbols = getMentorAvailableSymbols(robot);
+  if (requiresSymbolForAction(action) && !allowedSymbols.includes(symbol)) {
+    setFlash(req, 'error', 'This symbol is not allowed for the selected robot.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  const fingerprint = buildSignalFingerprint({
+    mentorId: mentor.id,
+    robotId: robot.id,
+    action,
+    symbol,
+    direction,
+    platform,
+    lotSize,
+    stopLoss,
+    takeProfit,
+  });
+  const duplicate = findRecentSignalByFingerprint(mentor.id, fingerprint, 45 * 1000);
+  if (duplicate && ['queued', 'processing', 'completed'].includes(String(duplicate.status || '').toLowerCase())) {
+    setFlash(req, 'error', 'Duplicate signal blocked. Wait a moment before resending.');
+    return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
+  }
+
+  const protection = getMentorNewsProtectionSettings(mentor);
+  const protectionEvents = await getUpcomingForexEvents(now, {
+    filter: 'today',
+    includeLowImpact: false,
+    limit: 120,
+  });
+  const gate = evaluateNewsProtectionGate({
+    events: protectionEvents.items,
+    symbol,
+    modeConfig: protection,
+    nowDate: now,
+  });
+
+  const robotComment = String(body.robotComment || robot.commentTag || robot.name || DEFAULT_ROBOT_NAME).trim();
+  const signalRecord = createSignalRecord({
+    mentorId: mentor.id,
+    mentorPortalId: mentor.mentorPortalId,
+    robotId: robot.id,
+    robotName: sanitizeRobotName(robot.name),
+    action,
+    direction,
+    symbol,
+    lotSize,
+    stopLoss,
+    takeProfit,
+    platform,
+    comment: robotComment,
+    fingerprint,
+    status: 'queued',
+    source: 'mentor_portal',
+  });
+
+  createAuditLog({
+    mentorId: mentor.id,
+    signalId: signalRecord.id,
+    actor: 'mentor_portal',
+    eventType: 'signal_created',
+    detail: `${action} ${symbol || 'ALL'} on ${platform}`,
+    meta: {
+      robotId: robot.id,
+      robotName: robot.name,
+      protectionMode: protection.mode,
+      protectionGate: gate,
+    },
+  });
+
+  const subscriptions = listClientSubscriptionsByMentor(mentor.id).filter((item) => {
+    if (!item || !isSubscriptionActiveNow(item, now)) {
+      return false;
+    }
+    return String(item.robotId || '').trim() === robot.id;
+  });
+
+  const jobsToCreate = [];
+  let blockedByRules = 0;
+  for (const subscription of subscriptions) {
+    if (subscription.copyTradingEnabled === false) {
+      blockedByRules += 1;
+      createAuditLog({
+        mentorId: mentor.id,
+        signalId: signalRecord.id,
+        actor: 'signal_filter',
+        eventType: 'user_skipped',
+        detail: `${subscription.clientEmail}: copy trading disabled`,
+      });
+      continue;
+    }
+
+    const activeConnection = getActiveBrokerConnection(subscription.brokerConnections, platform);
+    if (!activeConnection) {
+      blockedByRules += 1;
+      createAuditLog({
+        mentorId: mentor.id,
+        signalId: signalRecord.id,
+        actor: 'signal_filter',
+        eventType: 'user_skipped',
+        detail: `${subscription.clientEmail}: broker not connected (${platform})`,
+      });
+      continue;
+    }
+
+    const symbolConfigs = getClientSymbolConfigMap(subscription, allowedSymbols);
+    const symbolConfig = requiresSymbolForAction(action) ? symbolConfigs[symbol] : null;
+    if (requiresSymbolForAction(action) && !symbolConfig) {
+      blockedByRules += 1;
+      createAuditLog({
+        mentorId: mentor.id,
+        signalId: signalRecord.id,
+        actor: 'signal_filter',
+        eventType: 'user_skipped',
+        detail: `${subscription.clientEmail}: symbol not configured (${symbol})`,
+      });
+      continue;
+    }
+
+    if (action === 'BUY' || action === 'SELL') {
+      const allowedDirection = symbolConfig && symbolConfig.direction ? symbolConfig.direction : 'BOTH';
+      if (allowedDirection !== 'BOTH' && allowedDirection !== direction) {
+        blockedByRules += 1;
+        createAuditLog({
+          mentorId: mentor.id,
+          signalId: signalRecord.id,
+          actor: 'signal_filter',
+          eventType: 'user_skipped',
+          detail: `${subscription.clientEmail}: direction not allowed (${allowedDirection})`,
+        });
+        continue;
+      }
+
+      const executionState = normalizeTradeExecutionState(subscription.tradeExecution);
+      const symbolState = executionState.bySymbol[symbol] || { count: 0 };
+      const maxTrades = toNonNegativeInteger(symbolConfig.maxTrades, 1);
+      if (maxTrades > 0 && Number(symbolState.count || 0) >= maxTrades) {
+        blockedByRules += 1;
+        createAuditLog({
+          mentorId: mentor.id,
+          signalId: signalRecord.id,
+          actor: 'signal_filter',
+          eventType: 'user_skipped',
+          detail: `${subscription.clientEmail}: max trades reached (${symbol})`,
+        });
+        continue;
+      }
+    }
+
+    if (isSignalActionOrderLike(action) && gate.active && gate.blocked) {
+      blockedByRules += 1;
+      createAuditLog({
+        mentorId: mentor.id,
+        signalId: signalRecord.id,
+        actor: 'news_protection',
+        eventType: 'user_blocked',
+        detail: `${subscription.clientEmail}: blocked by news protection.`,
+        meta: { symbol, gate },
+      });
+      continue;
+    }
+
+    const symbolForJob = requiresSymbolForAction(action)
+      ? normalizeBridgeSymbol(symbol, activeConnection && activeConnection.brokerName)
+      : '';
+    const defaultLotSize = symbolConfig ? Number(symbolConfig.lotSize || lotSize) : lotSize;
+    const jobStatus = isSignalActionOrderLike(action) && gate.active && gate.delayMinutes > 0
+      ? 'retry_wait'
+      : 'queued';
+    const nextRetryAt = jobStatus === 'retry_wait'
+      ? new Date(now.getTime() + gate.delayMinutes * 60 * 1000).toISOString()
+      : null;
+
+    jobsToCreate.push({
+      signalId: signalRecord.id,
+      userId: subscription.id,
+      mentorId: mentor.id,
+      mentorPortalId: mentor.mentorPortalId,
+      robotId: robot.id,
+      subscriptionId: subscription.id,
+      symbol: symbolForJob,
+      action,
+      direction: action === 'BUY' || action === 'SELL' ? direction : '',
+      lotSize: defaultLotSize,
+      stopLoss,
+      takeProfit,
+      robotComment,
+      platform,
+      executionStatus: jobStatus,
+      errorCode: jobStatus === 'retry_wait' ? 'NEWS_PROTECTION_DELAY' : '',
+      errorMessage: jobStatus === 'retry_wait' ? gate.reason : '',
+      retryCount: 0,
+      maxRetries: BRIDGE_MAX_RETRIES,
+      nextRetryAt,
+    });
+  }
+
+  createSignalJobsBulk(jobsToCreate);
+  updateSignalRecord(signalRecord.id, {
+    targetCount: subscriptions.length,
+    queuedCount: jobsToCreate.filter((item) => item.executionStatus === 'queued').length,
+    blockedCount: blockedByRules,
+    status: jobsToCreate.length ? 'processing' : 'failed',
+  });
+
+  await dispatchSignalJobQueue({ limit: 80 });
+
+  const immediateQueuedCount = jobsToCreate.filter((item) => item.executionStatus === 'queued').length;
+  const delayedCount = jobsToCreate.filter((item) => item.executionStatus === 'retry_wait').length;
+  setFlash(
+    req,
+    'success',
+    `Signal queued. ${immediateQueuedCount} immediate, ${delayedCount} delayed, ${blockedByRules} blocked by rules.`
+  );
+  return res.redirect('/mentor/dashboard?section=copy-trading#copy-trading');
 });
 
 app.post('/mentor/robots/:robotId/convert-mobile', requireAuth, requireRole('mentor'), (req, res) => {
@@ -2345,13 +3087,17 @@ app.post('/superhost/robots', requireAuth, requireRole('superhost'), (req, res) 
     return Number.isFinite(parsed) ? parsed : fallback;
   };
   const requestedImageUrl = String(body.imageUrl || '').trim();
-  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, `${req.currentUser.id}:${name}`, name);
 
   createRobot({
     mentorId: req.currentUser.id,
     name,
     description: String(body.description || '').trim(),
     category: String(body.category || '').trim(),
+    commentTag: String(body.commentTag || '').trim() || name,
+    tradingMode: String(body.tradingMode || '').trim() || 'automated',
+    riskProfile: String(body.riskProfile || '').trim() || 'balanced',
+    licenseRequired: true,
     version: String(body.version || '').trim() || 'v1.0.0',
     status: String(body.status || '').trim() || 'draft',
     imageUrl,
@@ -2398,7 +3144,7 @@ app.post('/superhost/robots/:robotId/image', requireAuth, requireRole('superhost
 
   const requestedImageUrl = String(req.body && req.body.imageUrl || '').trim();
   const imageSeed = `${req.currentUser.id}:${robot.id}:${robot.name || ''}`;
-  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
+  const imageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed, robot.name);
 
   updateRobot(robot.id, {
     imageUrl,
@@ -2713,6 +3459,27 @@ function setFlash(req, type, message) {
   req.session.flash = { type, message };
 }
 
+function startBridgeOrchestratorLoops() {
+  const queueIntervalMs = Number(process.env.BRIDGE_QUEUE_INTERVAL_MS || 2500);
+  const healthIntervalMs = Number(process.env.BRIDGE_HEALTH_INTERVAL_MS || 10000);
+
+  setInterval(async () => {
+    try {
+      await dispatchSignalJobQueue({ limit: 120 });
+    } catch (_error) {
+      // Ignore queue loop errors and continue on next cycle.
+    }
+  }, Math.max(1000, queueIntervalMs));
+
+  setInterval(() => {
+    try {
+      cleanupStaleBridgeSessions(new Date());
+    } catch (_error) {
+      // Ignore health cleanup errors and continue on next cycle.
+    }
+  }, Math.max(5000, healthIntervalMs));
+}
+
 function requireAuth(req, res, next) {
   if (!req.currentUser) {
     setFlash(req, 'error', 'Please sign in first.');
@@ -2742,6 +3509,7 @@ function normalizeMentorDashboardSection(value) {
     'track-business',
     'manage-eas',
     'generate-key',
+    'copy-trading',
     'forex-events',
     'app-previews',
   ]);
@@ -2778,22 +3546,29 @@ function normalizeSuperhostDashboardSection(value) {
   return normalized;
 }
 
-async function getUpcomingForexEvents(nowDate = new Date()) {
-  const windowStart = new Date(nowDate.getTime());
-  const windowEnd = new Date(nowDate.getTime());
-  windowEnd.setDate(windowEnd.getDate() + 14);
-  windowEnd.setHours(23, 59, 59, 999);
+async function getUpcomingForexEvents(nowDate = new Date(), options = {}) {
+  const now = nowDate instanceof Date ? nowDate : new Date(nowDate);
+  const filter = normalizeForexFilter(options.filter);
+  const currencyFilter = normalizeForexCurrencyFilter(options.currency);
+  const limit = Number.isInteger(Number(options.limit))
+    ? Math.max(1, Math.min(200, Number(options.limit)))
+    : 80;
+  const includeLowImpact = options.includeLowImpact !== false;
+  const { windowStart, windowEnd } = getForexWindowRange(now, filter);
 
   const feedItems = await fetchForexEventsFeedItems();
-  const normalizedItems = feedItems
+  const mapped = feedItems
     .map(normalizeForexEventItem)
     .filter(Boolean)
     .filter((item) => item.date.getTime() >= windowStart.getTime())
     .filter((item) => item.date.getTime() <= windowEnd.getTime())
-    .filter(isRelevantForexEvent)
+    .filter((item) => item.date.getTime() >= now.getTime())
+    .filter((item) => isRelevantForexEvent(item, includeLowImpact))
+    .filter((item) => !currencyFilter || item.currency === currencyFilter)
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, 20)
+    .slice(0, limit)
     .map((item) => {
+      const countdownMs = item.date.getTime() - now.getTime();
       const dayLabel = new Intl.DateTimeFormat('en-ZA', {
         weekday: 'short',
         day: '2-digit',
@@ -2806,21 +3581,296 @@ async function getUpcomingForexEvents(nowDate = new Date()) {
         hour12: false,
         timeZone: 'Africa/Johannesburg',
       }).format(item.date);
+
       return {
+        id: `${item.date.getTime()}_${item.currency}_${item.title}`
+          .toLowerCase()
+          .replace(/[^a-z0-9_]+/g, '_'),
         title: item.title,
         country: item.country,
+        currency: item.currency,
         impact: item.impact,
-        forecast: item.forecast,
-        previous: item.previous,
+        impactLevel: normalizeForexImpact(item.impact),
+        forecast: item.forecast || '-',
+        previous: item.previous || '-',
+        actual: item.actual || '-',
+        affectedSymbols: mapCurrencyToSymbols(item.currency),
         dayLabel,
         timeLabel,
+        timestamp: item.date.toISOString(),
+        countdownMs,
+        countdownLabel: formatEventCountdown(countdownMs),
       };
     });
 
+  const summary = buildForexImpactSummary(mapped);
+  const nextHighImpact = mapped.find((item) => item.impactLevel === 'high') || null;
+  const banner = buildForexImpactBanner(filter, summary, nextHighImpact);
+
   return {
+    filter,
+    currencyFilter: currencyFilter || '',
+    generatedAt: now.toISOString(),
     fromLabel: formatDashboardDate(windowStart),
     toLabel: formatDashboardDate(windowEnd),
-    items: normalizedItems,
+    items: mapped,
+    summary,
+    nextHighImpact,
+    banner,
+    volatility: inferForexVolatilityLevel(summary, mapped),
+  };
+}
+
+function normalizeForexFilter(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'tomorrow') {
+    return 'tomorrow';
+  }
+  if (normalized === 'week' || normalized === 'this-week') {
+    return 'week';
+  }
+  if (normalized === 'two_weeks' || normalized === '2weeks') {
+    return 'two_weeks';
+  }
+  return 'today';
+}
+
+function normalizeForexCurrencyFilter(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized || normalized === 'ALL') {
+    return '';
+  }
+  if (!/^[A-Z]{3}$/.test(normalized)) {
+    return '';
+  }
+  return normalized;
+}
+
+function getForexWindowRange(nowDate, filter) {
+  const now = nowDate instanceof Date ? nowDate : new Date(nowDate);
+  const start = new Date(now.getTime());
+  const end = new Date(now.getTime());
+
+  if (filter === 'tomorrow') {
+    start.setDate(start.getDate() + 1);
+    start.setHours(0, 0, 0, 0);
+    end.setDate(end.getDate() + 1);
+    end.setHours(23, 59, 59, 999);
+    return { windowStart: start, windowEnd: end };
+  }
+
+  if (filter === 'week') {
+    start.setHours(0, 0, 0, 0);
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { windowStart: start, windowEnd: end };
+  }
+
+  if (filter === 'two_weeks') {
+    start.setHours(0, 0, 0, 0);
+    end.setDate(end.getDate() + 13);
+    end.setHours(23, 59, 59, 999);
+    return { windowStart: start, windowEnd: end };
+  }
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { windowStart: start, windowEnd: end };
+}
+
+function normalizeForexImpact(value) {
+  const impact = String(value || '').trim().toLowerCase();
+  if (impact.startsWith('high')) {
+    return 'high';
+  }
+  if (impact.startsWith('med')) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function formatEventCountdown(countdownMs) {
+  if (!Number.isFinite(Number(countdownMs))) {
+    return '-';
+  }
+  const ms = Math.max(0, Number(countdownMs));
+  const totalMinutes = Math.floor(ms / (60 * 1000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+  }
+  return `${minutes}m`;
+}
+
+function buildForexImpactSummary(items) {
+  const summary = {
+    total: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const level = normalizeForexImpact(item && item.impactLevel ? item.impactLevel : item && item.impact);
+    summary.total += 1;
+    if (level === 'high') {
+      summary.high += 1;
+      continue;
+    }
+    if (level === 'medium') {
+      summary.medium += 1;
+      continue;
+    }
+    summary.low += 1;
+  }
+
+  return summary;
+}
+
+function buildForexImpactBanner(filter, summary, nextHighImpact) {
+  const label = filter === 'tomorrow' ? 'Tomorrow' : filter === 'week' ? 'This Week' : 'Today';
+  const high = Number(summary && summary.high ? summary.high : 0);
+  const medium = Number(summary && summary.medium ? summary.medium : 0);
+  const low = Number(summary && summary.low ? summary.low : 0);
+  const nextText = nextHighImpact
+    ? ` Next high impact: ${nextHighImpact.currency} ${nextHighImpact.title} in ${nextHighImpact.countdownLabel}.`
+    : '';
+  return `${label}: ${high} high, ${medium} medium, ${low} low impact events.${nextText}`.trim();
+}
+
+function inferForexVolatilityLevel(summary, items) {
+  const high = Number(summary && summary.high ? summary.high : 0);
+  const medium = Number(summary && summary.medium ? summary.medium : 0);
+  const nextFewHoursCount = (Array.isArray(items) ? items : []).filter((item) => {
+    const countdown = Number(item && item.countdownMs);
+    return Number.isFinite(countdown) && countdown <= 6 * 60 * 60 * 1000;
+  }).length;
+
+  if (high >= 3 || nextFewHoursCount >= 5) {
+    return 'high';
+  }
+  if (high >= 1 || medium >= 3 || nextFewHoursCount >= 2) {
+    return 'medium';
+  }
+  return 'normal';
+}
+
+function mapCurrencyToSymbols(currencyValue) {
+  const currency = String(currencyValue || '').trim().toUpperCase();
+  const baseMap = {
+    USD: ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'XAUUSD', 'US30', 'USTECH'],
+    EUR: ['EURUSD', 'EURGBP', 'EURJPY', 'EURAUD'],
+    GBP: ['GBPUSD', 'EURGBP', 'GBPJPY', 'GBPAUD'],
+    JPY: ['USDJPY', 'EURJPY', 'GBPJPY', 'AUDJPY'],
+    AUD: ['AUDUSD', 'AUDJPY', 'EURAUD', 'GBPAUD'],
+    CAD: ['USDCAD', 'CADJPY', 'EURCAD'],
+    CHF: ['USDCHF', 'EURCHF', 'CHFJPY'],
+    NZD: ['NZDUSD', 'EURNZD', 'GBPNZD'],
+    XAU: ['XAUUSD'],
+  };
+
+  return baseMap[currency] || [];
+}
+
+function getNewsProtectionModeConfig(modeValue) {
+  const normalized = String(modeValue || '').trim().toLowerCase();
+  return NEWS_PROTECTION_MODES[normalized] || NEWS_PROTECTION_MODES[DEFAULT_NEWS_PROTECTION_MODE];
+}
+
+function getMentorNewsProtectionSettings(mentor) {
+  const mode = getNewsProtectionModeConfig(mentor && mentor.newsProtectionMode);
+  const enabled = mentor && mentor.newsProtectionEnabled !== false;
+  return {
+    enabled,
+    mode: mode.key,
+    modeLabel: mode.label,
+    pauseBeforeMinutes: mode.pauseBeforeMinutes,
+    pauseAfterMinutes: mode.pauseAfterMinutes,
+    behavior: mode.behavior,
+  };
+}
+
+function isSignalActionOrderLike(actionValue) {
+  const action = normalizeSignalAction(actionValue);
+  return action === 'BUY' || action === 'SELL' || action === 'PARTIAL_CLOSE';
+}
+
+function evaluateNewsProtectionGate({ events, symbol, modeConfig, nowDate }) {
+  if (!modeConfig || !modeConfig.enabled) {
+    return {
+      active: false,
+      blocked: false,
+      delayMinutes: 0,
+      reason: '',
+      relatedEvents: [],
+    };
+  }
+
+  const now = nowDate instanceof Date ? nowDate : new Date(nowDate);
+  const normalizedSymbol = normalizeSymbolToken(symbol);
+  const beforeMs = Number(modeConfig.pauseBeforeMinutes || 0) * 60 * 1000;
+  const afterMs = Number(modeConfig.pauseAfterMinutes || 0) * 60 * 1000;
+
+  const relatedEvents = (Array.isArray(events) ? events : []).filter((eventItem) => {
+    if (normalizeForexImpact(eventItem && eventItem.impactLevel ? eventItem.impactLevel : eventItem.impact) !== 'high') {
+      return false;
+    }
+    const eventSymbols = Array.isArray(eventItem && eventItem.affectedSymbols)
+      ? eventItem.affectedSymbols.map((item) => normalizeSymbolToken(item))
+      : [];
+    if (!eventSymbols.length || !normalizedSymbol) {
+      return true;
+    }
+    return eventSymbols.includes(normalizedSymbol);
+  }).filter((eventItem) => {
+    const eventTime = Date.parse(eventItem.timestamp || eventItem.date || 0) || 0;
+    const diff = eventTime - now.getTime();
+    return diff >= -afterMs && diff <= beforeMs;
+  });
+
+  if (!relatedEvents.length) {
+    return {
+      active: false,
+      blocked: false,
+      delayMinutes: 0,
+      reason: '',
+      relatedEvents: [],
+    };
+  }
+
+  const nextEvent = relatedEvents
+    .slice()
+    .sort((a, b) => (Date.parse(a.timestamp || 0) || 0) - (Date.parse(b.timestamp || 0) || 0))[0];
+  const nextEventMs = Date.parse(nextEvent.timestamp || 0) || 0;
+  const delayMinutes = Math.max(1, Math.ceil((nextEventMs + afterMs - now.getTime()) / (60 * 1000)));
+
+  if (modeConfig.behavior === 'block') {
+    return {
+      active: true,
+      blocked: true,
+      delayMinutes,
+      reason: `News protection blocked execution near ${nextEvent.currency} ${nextEvent.title}.`,
+      relatedEvents,
+    };
+  }
+
+  if (modeConfig.behavior === 'delay') {
+    return {
+      active: true,
+      blocked: false,
+      delayMinutes,
+      reason: `News protection delay suggested for ${delayMinutes} minute(s).`,
+      relatedEvents,
+    };
+  }
+
+  return {
+    active: true,
+    blocked: false,
+    delayMinutes: 0,
+    reason: '',
+    relatedEvents,
   };
 }
 
@@ -2859,9 +3909,11 @@ function normalizeForexEventItem(item) {
 
   const title = String(item.title || '').trim();
   const country = String(item.country || '').trim() || 'FX';
+  const currency = String(item.currency || '').trim().toUpperCase() || country.toUpperCase();
   const impact = String(item.impact || '').trim() || 'Low';
   const forecast = String(item.forecast || '').trim();
   const previous = String(item.previous || '').trim();
+  const actual = String(item.actual || '').trim();
   const dateRaw = String(item.date || '').trim();
   if (!title || !dateRaw) {
     return null;
@@ -2875,16 +3927,22 @@ function normalizeForexEventItem(item) {
   return {
     title,
     country,
+    currency,
     impact,
     forecast,
     previous,
+    actual,
     date,
   };
 }
 
-function isRelevantForexEvent(eventItem) {
+function isRelevantForexEvent(eventItem, includeLowImpact = true) {
   const impact = String(eventItem.impact || '').trim().toLowerCase();
   if (impact === 'high' || impact === 'medium') {
+    return true;
+  }
+
+  if (includeLowImpact && impact === 'low') {
     return true;
   }
 
@@ -3035,6 +4093,10 @@ function bootstrapDefaultMentorAccount() {
       name: DEFAULT_TEST_ROBOT_NAME,
       description: 'Default onboarding robot profile for mobile identity tests.',
       category: 'Forex',
+      commentTag: DEFAULT_TEST_ROBOT_NAME,
+      tradingMode: 'automated',
+      riskProfile: 'balanced',
+      licenseRequired: true,
       version: 'v1.0.0',
       status: 'live',
       imageUrl: TEST_LADY_ROBOT_IMAGE_URL,
@@ -3196,7 +4258,7 @@ function migrateLegacyRobotImages() {
       }
 
       updateRobot(robot.id, {
-        imageUrl: resolveRobotImageUrl(imageUrl, robot.id || robot.name || user.id),
+        imageUrl: resolveRobotImageUrl(imageUrl, robot.id || robot.name || user.id, robot.name),
       });
     }
   }
@@ -3260,7 +4322,7 @@ function sanitizeRobotName(inputName) {
 function pickDefaultRobotImage(seedValue) {
   const pool = DEFAULT_ROBOT_IMAGE_URLS;
   if (!pool.length) {
-    return '/assets/future-ea-pro-logo.png';
+    return NEUTRAL_ROBOT_PLACEHOLDER_IMAGE_URL;
   }
 
   const seedText = String(seedValue || '');
@@ -3271,6 +4333,17 @@ function pickDefaultRobotImage(seedValue) {
 
   const index = Math.abs(hash) % pool.length;
   return pool[index];
+}
+
+function normalizeBotName(botNameValue) {
+  return String(botNameValue || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function isFutureEaTestBotName(botNameValue) {
+  return normalizeBotName(botNameValue) === normalizeBotName(FUTURE_EA_TEST_BOT_NAME);
 }
 
 function isLegacyTestReplacementImage(imageUrlValue) {
@@ -3295,15 +4368,20 @@ function shouldReplaceLegacyRobotImage(imageUrlValue) {
   return FORBIDDEN_ROBOT_IMAGE_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-function resolveRobotImageUrl(imageUrlValue, imageSeed = '') {
+function resolveRobotImageUrl(imageUrlValue, imageSeed = '', botName = '') {
   const normalized = String(imageUrlValue || '').trim();
-  if (isLegacyTestReplacementImage(normalized)) {
+  if (isFutureEaTestBotName(botName)) {
     return TEST_LADY_ROBOT_IMAGE_URL;
   }
-  if (shouldReplaceLegacyRobotImage(normalized)) {
-    return pickDefaultRobotImage(imageSeed);
+
+  if (normalized === TEST_LADY_ROBOT_IMAGE_URL || isLegacyTestReplacementImage(normalized)) {
+    return NEUTRAL_ROBOT_PLACEHOLDER_IMAGE_URL;
   }
-  return normalized || pickDefaultRobotImage(imageSeed);
+
+  if (shouldReplaceLegacyRobotImage(normalized)) {
+    return NEUTRAL_ROBOT_PLACEHOLDER_IMAGE_URL;
+  }
+  return normalized || pickDefaultRobotImage(imageSeed || botName);
 }
 
 function isThemeMatch(theme, referenceTheme) {
@@ -3574,6 +4652,19 @@ function readApiPayload(req) {
   };
 }
 
+function isValidBridgeAgentToken(rawToken) {
+  const provided = Buffer.from(String(rawToken || '').trim());
+  const expected = Buffer.from(String(BRIDGE_AGENT_SHARED_TOKEN || '').trim());
+  if (!provided.length || !expected.length || provided.length !== expected.length) {
+    return false;
+  }
+  try {
+    return crypto.timingSafeEqual(provided, expected);
+  } catch (_error) {
+    return false;
+  }
+}
+
 function parseMentorPortalIdInput(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 100) {
@@ -3728,7 +4819,7 @@ function sanitizeRobotForClientDisplay(robot, fallbackSeed = '') {
   const safeName = sanitizeRobotName(robot.name);
   const requestedImageUrl = String(robot.imageUrl || '').trim();
   const imageSeed = robot.id || safeName || fallbackSeed || 'future-ea-pro';
-  const safeImageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed);
+  const safeImageUrl = resolveRobotImageUrl(requestedImageUrl, imageSeed, safeName);
 
   return {
     ...robot,
@@ -4233,6 +5324,15 @@ function normalizeClientRobotSection(value) {
     .toLowerCase();
   if (normalized === 'metrader') {
     return 'metatrader';
+  }
+  if (normalized === 'robots') {
+    return 'home';
+  }
+  if (normalized === 'allowed-symbols' || normalized === 'symbols') {
+    return 'quotes';
+  }
+  if (normalized === 'theme-layout') {
+    return 'settings';
   }
   if (CLIENT_ROBOT_SECTIONS.includes(normalized)) {
     return normalized;
